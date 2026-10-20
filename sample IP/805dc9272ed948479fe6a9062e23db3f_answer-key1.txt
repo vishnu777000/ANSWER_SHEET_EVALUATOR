@@ -1,0 +1,29 @@
+Q1. What is Artificial Intelligence (AI)?
+Answer: Artificial Intelligence is the simulation of human intelligence in machines that are programmed to think and learn.
+
+Q2. What is machine learning?
+Answer: Machine learning is a subset of AI that enables systems to learn from data and improve performance without explicit programming.
+
+Q3. What is data preprocessing?
+Answer: Data preprocessing is the process of cleaning and preparing raw data for analysis.
+
+Q4. What is supervised learning?
+Answer: Supervised learning is a type of machine learning where the model is trained using labeled data.
+
+Q5. What is unsupervised learning?
+Answer: Unsupervised learning is a type of machine learning where the model learns patterns from unlabeled data.
+
+Q6. What is feature extraction?
+Answer: Feature extraction is the process of identifying important attributes from raw data for model training.
+
+Q7. What is overfitting?
+Answer: Overfitting occurs when a model learns the training data too well and performs poorly on new data.
+
+Q8. What is a dataset?
+Answer: A dataset is a collection of data used for training and testing models.
+
+Q9. What is classification?
+Answer: Classification is a machine learning task of assigning data into predefined categories.
+
+Q10. What is accuracy in machine learning?
+Answer: Accuracy is the ratio of correctly predicted instances to total instances.

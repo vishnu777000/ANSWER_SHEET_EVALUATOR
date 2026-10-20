@@ -1,0 +1,29 @@
+Q1. What is Deep Learning?
+Answer: Deep learning is a subset of machine learning that uses neural networks with many layers to learn from data.
+
+Q2. What is a neural network?
+Answer: A neural network is a model inspired by the human brain that processes data through layers of interconnected nodes.
+
+Q3. What is training data?
+Answer: Training data is the dataset used to train a machine learning model.
+
+Q4. What is testing data?
+Answer: Testing data is the dataset used to evaluate the performance of a trained model.
+
+Q5. What is a model in machine learning?
+Answer: A model is a system that makes predictions or decisions based on data.
+
+Q6. What is regression?
+Answer: Regression is a machine learning task used to predict continuous values.
+
+Q7. What is a label?
+Answer: A label is the correct output or target value associated with input data.
+
+Q8. What is data mining?
+Answer: Data mining is the process of discovering patterns and useful information from large datasets.
+
+Q9. What is an algorithm?
+Answer: An algorithm is a step-by-step procedure used to solve a problem.
+
+Q10. What is prediction in machine learning?
+Answer: Prediction is the process of using a trained model to estimate unknown outcomes.

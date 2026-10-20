@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Results · Answer Sheet Evaluator</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:#0f172a;--paper:#eef2ff;--accent:#6366f1;--muted:#64748b;
+    --border:#cbd5e1;--card:#ffffff;--success:#10b981;
+    --mono:'Space Mono',monospace;--sans:'DM Sans',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:var(--sans);
+    background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 45%,#ecfeff 100%);
+    color:var(--ink);min-height:100vh;
+  }
+  header{
+    background:rgba(15,23,42,0.82);backdrop-filter:blur(16px);color:#fff;
+    padding:0 2rem;display:flex;align-items:center;justify-content:space-between;
+    height:64px;border-bottom:1px solid rgba(255,255,255,0.12);
+    box-shadow:0 8px 32px rgba(15,23,42,0.15);
+  }
+  .logo{font-family:var(--sans);font-size:1.05rem;font-weight:600;display:flex;align-items:center;gap:0.6rem}
+  .logo-dot{width:10px;height:10px;background:var(--accent);border-radius:50%}
+  nav a{color:rgba(255,255,255,0.6);text-decoration:none;font-size:0.875rem;margin-left:1.5rem;transition:color 0.2s}
+  nav a:hover,nav a.active{color:#fff}
+  .page{max-width:960px;margin:2.5rem auto;padding:0 1.5rem}
+  .page-title{font-size:1.4rem;font-weight:600;margin-bottom:1.5rem}
+  .subject-tabs{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.5rem}
+  .tab-btn{
+    padding:0.45rem 1rem;border:1px solid rgba(99,102,241,0.25);border-radius:20px;
+    background:rgba(255,255,255,0.65);cursor:pointer;font-size:0.82rem;font-family:var(--mono);
+    transition:all 0.2s;white-space:nowrap;backdrop-filter:blur(8px);
+  }
+  .tab-btn:hover,.tab-btn.active{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-color:transparent}
+  .table-wrap{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    overflow:hidden;overflow-x:auto;backdrop-filter:blur(16px);
+    box-shadow:0 12px 40px rgba(99,102,241,0.08);
+  }
+  table{width:100%;border-collapse:collapse;font-size:0.85rem}
+  thead{background:rgba(15,23,42,0.92);color:white}
+  th{padding:0.75rem 1rem;text-align:center;font-family:var(--mono);font-size:0.72rem;
+    letter-spacing:0.08em;white-space:nowrap}
+  td{padding:0.65rem 1rem;text-align:center;border-bottom:1px solid rgba(148,163,184,0.2)}
+  tr:nth-child(even) td{background:rgba(255,255,255,0.35)}
+  tr:hover td{background:rgba(99,102,241,0.08)}
+  .pct-cell{font-family:var(--mono);font-weight:700}
+  .pct-high{color:var(--success)}
+  .pct-mid{color:#f59e0b}
+  .pct-low{color:#e11d48}
+  .empty-state{padding:4rem;text-align:center;color:var(--muted);font-size:0.9rem}
+  .btn-dl{
+    display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 1.1rem;
+    background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:999px;
+    font-family:var(--mono);font-size:0.75rem;cursor:pointer;text-decoration:none;margin-bottom:1.5rem;
+    box-shadow:0 8px 24px rgba(16,185,129,0.25);
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>Answer Sheet Evaluator</div>
+  <nav>
+    <a href="/">Evaluate</a>
+    <a href="/results" class="active">Results</a>
+    <a href="/download">Download Excel</a>
+  </nav>
+</header>
+
+<div class="page">
+  <div class="page-title">Stored Results</div>
+
+  {% if subjects %}
+  <div class="subject-tabs" id="tabs">
+    {% for s in subjects %}
+    <button class="tab-btn" onclick="loadSubject('{{ s }}', this)">{{ s }}</button>
+    {% endfor %}
+  </div>
+  <a href="/download" class="btn-dl">⬇ Download Full Excel</a>
+  <div class="table-wrap">
+    <div id="table-container"><div class="empty-state">Select a subject above to view results.</div></div>
+  </div>
+  {% else %}
+  <div class="empty-state">No results yet. <a href="/">Run an evaluation</a> first.</div>
+  {% endif %}
+</div>
+
+<script>
+async function loadSubject(subject, btn) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+
+  const container = document.getElementById("table-container");
+  container.innerHTML = '<div class="empty-state">Loading…</div>';
+
+  try {
+    const resp = await fetch("/results/" + encodeURIComponent(subject));
+    const rows = await resp.json();
+
+    if (!rows.length) {
+      container.innerHTML = '<div class="empty-state">No records for this subject.</div>';
+      return;
+    }
+
+    const headers = Object.keys(rows[0]);
+    let html = "<table><thead><tr>";
+    headers.forEach(h => html += `<th>${h}</th>`);
+    html += "</tr></thead><tbody>";
+
+    rows.forEach(row => {
+      html += "<tr>";
+      headers.forEach(h => {
+        let val = row[h] ?? "";
+        let cls = "";
+        if (h.toLowerCase().includes("percent") || h.toLowerCase().includes("pct")) {
+          const num = parseFloat(val);
+          cls = num >= 70 ? "pct-high" : num >= 40 ? "pct-mid" : "pct-low";
+          val = isNaN(num) ? val : num + "%";
+        }
+        html += `<td class="${cls} pct-cell">${val}</td>`;
+      });
+      html += "</tr>";
+    });
+    html += "</tbody></table>";
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = '<div class="empty-state">Failed to load results.</div>';
+  }
+}
+
+document.querySelector(".tab-btn")?.click();
+</script>
+</body>
+</html>

@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Sheet Evaluator</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:     #0f172a;
+    --paper:   #eef2ff;
+    --accent:  #6366f1;
+    --accent2: #e11d48;
+    --muted:   #64748b;
+    --border:  #cbd5e1;
+    --border-strong: #94a3b8;
+    --card:    #ffffff;
+    --input-bg: #ffffff;
+    --input-border: #94a3b8;
+    --success: #10b981;
+    --warn:    #f59e0b;
+    --mono:    'Space Mono', monospace;
+    --sans:    'DM Sans', sans-serif;
+    --glass-blur: blur(16px);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: linear-gradient(135deg, #eef2ff 0%, #fdf2f8 45%, #ecfeff 100%);
+    color: var(--ink);
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -20%;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(99,102,241,0.18), transparent 45%),
+      radial-gradient(circle at 80% 10%, rgba(236,72,153,0.12), transparent 40%),
+      radial-gradient(circle at 60% 80%, rgba(16,185,129,0.10), transparent 45%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  header, .hero, .main-grid, #results-panel, #error-banner { position: relative; z-index: 1; }
+
+  /* ── Header ── */
+  header {
+    background: rgba(15,23,42,0.82);
+    backdrop-filter: var(--glass-blur);
+    color: #fff;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 8px 32px rgba(15,23,42,0.15);
+  }
+  .logo {
+    font-family: var(--sans);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .logo-dot { width: 10px; height: 10px; background: var(--accent); border-radius: 50%; }
+  nav a {
+    color: rgba(255,255,255,0.6);
+    text-decoration: none;
+    font-size: 0.875rem;
+    margin-left: 1.5rem;
+    transition: color 0.2s;
+  }
+  nav a:hover, nav a.active { color: #fff; }
+
+  /* ── Hero ── */
+  .hero {
+    max-width: 960px;
+    margin: 3rem auto 0;
+    padding: 0 1.5rem;
+  }
+  .hero-tag {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+  .hero h1 {
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    animation: heroFade 0.8s ease both;
+  }
+  @keyframes heroFade {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero p { animation: heroFade 0.8s ease 0.15s both; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p {
+    margin-top: 0.75rem;
+    color: var(--muted);
+    max-width: 560px;
+    line-height: 1.65;
+  }
+
+  /* ── Layout ── */
+  .main-grid {
+    max-width: 960px;
+    margin: 2.5rem auto 4rem;
+    padding: 0 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.75rem;
+    box-shadow: 0 8px 28px rgba(15,23,42,0.08);
+  }
+  .card-title {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink);
+    font-weight: 700;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border);
+  }
+
+  /* ── Form ── */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .field { margin-bottom: 1.1rem; }
+  label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-bottom: 0.4rem;
+    color: var(--ink);
+  }
+  input[type="text"], input[type="number"], select {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border: 2px solid var(--input-border);
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    color: var(--ink);
+    background: var(--input-bg);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  input::placeholder { color: #64748b; opacity: 1; }
+  input:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.22);
+    background: #fff;
+  }
+
+  /* ── Drop Zones ── */
+  .drop-area {
+    border: 2px dashed var(--border-strong);
+    border-radius: 14px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: #f8fafc;
+    position: relative;
+  }
+  .drop-label, .drop-formats { color: #475569; }
+  .drop-area:hover, .drop-area.dragover {
+    border-color: var(--accent);
+    background: #eef2ff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(99,102,241,0.15);
+  }
+  .btn-preview {
+    margin-top: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.72rem;
+    font-family: var(--mono);
+    border: 1px solid rgba(99,102,241,0.35);
+    background: rgba(255,255,255,0.7);
+    color: var(--accent);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-preview:hover { background: var(--accent); color: #fff; }
+  .drop-area input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 1.8rem; margin-bottom: 0.4rem; }
+  .drop-label { font-size: 0.85rem; color: var(--muted); }
+  .drop-label strong { color: var(--accent); }
+  .drop-formats { font-size: 0.72rem; color: var(--border); margin-top: 0.3rem; font-family: var(--mono); }
+  .file-chosen { font-size: 0.8rem; color: var(--success); margin-top: 0.4rem; font-weight: 500; }
+
+  /* ── Toggle ── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--border);
+    margin-top: 0.5rem;
+  }
+  .toggle-info { font-size: 0.82rem; }
+  .toggle-info small { display: block; color: var(--muted); font-size: 0.75rem; }
+  .toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0;
+    background: var(--border);
+    border-radius: 24px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  .slider::before {
+    content: "";
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; top: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+  }
+  input:checked + .slider { background: var(--accent); }
+  input:checked + .slider::before { transform: translateX(20px); }
+
+  /* ── Submit Button ── */
+  .btn-evaluate {
+    width: 100%;
+    padding: 0.85rem;
+    margin-top: 1.25rem;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-evaluate:hover { background: #1648c0; }
+  .btn-evaluate:active { transform: scale(0.98); }
+  .btn-evaluate:disabled { background: var(--border); cursor: not-allowed; }
+
+  /* ── Mode Switcher Tabs ── */
+  .mode-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .mode-tab {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--input-border);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    transition: all 0.2s ease;
+  }
+  .mode-tab:hover {
+    color: var(--ink);
+    border-color: var(--accent);
+  }
+  .mode-tab.active {
+    background: var(--ink);
+    color: #fff;
+    border-color: var(--ink);
+    box-shadow: 0 2px 8px rgba(13,17,23,0.15);
+  }
+
+  /* ── Batch Table & Badges ── */
+  .batch-table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    overflow-x: auto;
+  }
+  .batch-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .batch-table thead {
+    background: var(--ink);
+    color: white;
+  }
+  .batch-table th {
+    padding: 0.75rem 1rem;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  .batch-table td {
+    padding: 0.65rem 1rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .batch-table tr:nth-child(even) td { background: #f9f6f2; }
+  .batch-table tr:hover td { background: #eef4ff; }
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-family: var(--mono);
+    font-weight: 700;
+  }
+  .badge-success { background: #d3f9d8; color: #2b8a3e; }
+  .badge-warning { background: #fff3bf; color: #d9480f; }
+  .badge-danger  { background: #ffe3e3; color: #c92a2a; }
+  .btn-sm-view {
+    padding: 0.35rem 0.75rem;
+    background: #eef4ff;
+    color: var(--accent);
+    border: 1px solid #bfdbfe;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-sm-view:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .batch-tag {
+    display: inline-block;
+    background: #e9ecef;
+    border-radius: 4px;
+    padding: 0.2rem 0.5rem;
+    margin: 0.2rem;
+    font-size: 0.72rem;
+    font-family: var(--mono);
+    color: var(--ink);
+  }
+
+  /* ── Sidebar ── */
+  .sidebar { display: flex; flex-direction: column; gap: 1.25rem; }
+
+
+  /* ── How It Works ── */
+  .steps { list-style: none; }
+  .steps li {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: flex-start;
+  }
+  .step-num {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    width: 24px; height: 24px;
+    background: var(--ink);
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-text { font-size: 0.85rem; line-height: 1.5; color: var(--muted); }
+  .step-text strong { color: var(--ink); }
+
+  /* ── Loading Overlay ── */
+  #loading-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(13,17,23,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  #loading-overlay.active { display: flex; }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .spinner-label { color: white; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.1em; }
+  .progress-steps {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 520px;
+  }
+  .progress-step {
+    font-size: 0.72rem;
+    font-family: var(--mono);
+    color: rgba(255,255,255,0.45);
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.15);
+    transition: all 0.3s;
+  }
+  .progress-step.active {
+    color: #fff;
+    border-color: rgba(99,102,241,0.8);
+    background: rgba(99,102,241,0.35);
+    box-shadow: 0 0 20px rgba(99,102,241,0.35);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .gauge-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  .gauge {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: conic-gradient(var(--gauge-color, var(--accent)) calc(var(--pct, 0) * 1%), rgba(148,163,184,0.25) 0);
+    display: grid;
+    place-items: center;
+    position: relative;
+    animation: gaugePop 0.7s ease both;
+  }
+  .gauge::after {
+    content: "";
+    position: absolute;
+    inset: 12px;
+    background: rgba(255,255,255,0.92);
+    border-radius: 50%;
+    backdrop-filter: blur(8px);
+  }
+  .gauge-value {
+    position: relative;
+    z-index: 1;
+    font-family: var(--mono);
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  @keyframes gaugePop {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── Results Panel ── */
+  #results-panel {
+    display: none;
+    max-width: 960px;
+    margin: 0 auto 3rem;
+    padding: 0 1.5rem;
+    animation: slideIn 0.4s ease;
+  }
+  #results-panel.active { display: block; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+  .results-header h2 { font-size: 1.2rem; font-weight: 600; }
+  .btn-download {
+    padding: 0.5rem 1.1rem;
+    background: var(--success);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  /* ── Score Summary ── */
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .score-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+  .score-value {
+    font-family: var(--mono);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .score-label { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
+
+  /* ── Question Results ── */
+  .q-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+  }
+  .q-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .q-header:hover { background: #f9f9f9; }
+  .q-label { font-family: var(--mono); font-size: 0.85rem; font-weight: 700; }
+  .q-meta { display: flex; align-items: center; gap: 1rem; }
+  .q-marks { font-family: var(--mono); font-size: 0.9rem; }
+  .similarity-bar {
+    width: 80px; height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .similarity-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+  .chevron { transition: transform 0.2s; font-size: 0.8rem; color: var(--muted); }
+  .q-body {
+    display: none;
+    padding: 0 1.25rem 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .q-body.open { display: block; }
+  .answer-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+  .answer-box { background: #f8f5f0; border-radius: 6px; padding: 0.75rem 1rem; }
+  .answer-box-label { font-size: 0.7rem; font-family: var(--mono); color: var(--muted); text-transform: uppercase; margin-bottom: 0.4rem; }
+  .answer-box p { font-size: 0.85rem; line-height: 1.6; }
+  .feedback-row { margin-top: 1rem; font-size: 0.85rem; line-height: 1.55; color: #334155; }
+  .metrics-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .metric-chip {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    color: #3730a3;
+  }
+  #subject-dropdown {
+    background: #fff !important;
+    border: 2px solid var(--input-border) !important;
+  }
+
+  /* ── Error Banner ── */
+  #error-banner {
+    display: none;
+    max-width: 960px;
+    margin: 1rem auto;
+    padding: 0 1.5rem;
+  }
+  #error-banner.active { display: block; }
+  .error-box {
+    background: #fff5f5;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+    color: var(--accent2);
+  }
+
+  .sdrop-item {
+    padding: 0.55rem 0.9rem;
+    font-size: 0.87rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .sdrop-item:hover { background: #eef4ff; color: var(--accent); }
+  .sdrop-hint {
+    padding: 0.55rem 0.9rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  #subject_input { position: relative; }
+  .field { position: relative; }
+
+  @media (max-width: 720px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .form-row  { grid-template-columns: 1fr; }
+    .score-grid { grid-template-columns: 1fr 1fr; }
+    .answer-cols { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Answer Sheet Evaluator
+  </div>
+  <nav>
+    <a href="/" class="active">Evaluate</a>
+    <a href="/results">Results</a>
+    <a href="/download">Download Excel</a>
+  </nav>
+</header>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <!-- <div class="hero-tag">Evaluator · NLP</div> -->
+  <h1>Semantic & Similarity-Based<br><em>Answer Evaluation</em></h1>
+  <p>Upload answer keys and student responses in any format. The system automatically detects questions, matches them, and evaluates using NLP.</p>
+</div>
+
+<!-- ── Error Banner ──────────────────────────────────────────────────────── -->
+<div id="error-banner">
+  <div class="error-box" id="error-text"></div>
+</div>
+
+<!-- ── Main Grid ─────────────────────────────────────────────────────────── -->
+<div class="main-grid">
+
+  <!-- Left: Form -->
+  <div>
+    <!-- Mode Switcher Tabs -->
+    <div class="mode-tabs">
+      <button type="button" class="mode-tab active" id="tab-single" onclick="setMode('single')">👤 Single Evaluation</button>
+      <button type="button" class="mode-tab" id="tab-batch" onclick="setMode('batch')">📁 Batch Evaluation</button>
+    </div>
+
+    <!-- Subject & Marks Card (Common to both modes) -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-title">Subject & Exam Settings</div>
+      <div class="form-row">
+        <div class="field">
+          <label>Subject</label>
+          <input type="text" id="subject_input" placeholder="e.g. Machine Learning" autocomplete="off" oninput="filterSubjects(this.value)" onfocus="showDropdown()" onblur="hideDropdown()">
+          <div id="subject-dropdown" style="display:none;position:absolute;z-index:200;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,0.12);max-height:180px;overflow-y:auto;min-width:100%;width:100%;">
+            {% for s in subjects %}
+            <div class="sdrop-item" data-val="{{ s }}" onmousedown="pickSubject('{{ s }}')">{{ s }}</div>
+            {% endfor %}
+            {% if not subjects %}
+            <div class="sdrop-hint">No subjects yet — type a new one</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="field">
+          <label>Max Marks per Question</label>
+          <input type="number" id="max_marks" value="10" min="1" max="100">
+        </div>
+      </div>
+    </div>
+
+    <!-- Single Mode Student Information Card -->
+    <div class="card" id="student-info-card" style="margin-bottom:1rem;">
+      <div class="card-title">Student Information</div>
+      <div class="form-row">
+        <div class="field">
+          <label>Student Name</label>
+          <input type="text" id="student_name" placeholder="Enter student full name">
+        </div>
+        <div class="field">
+          <label>Register Number</label>
+          <input type="text" id="reg_number" placeholder="e.g. 21CS001">
+        </div>
+      </div>
+    </div>
+
+    <!-- Batch Mode Info Banner -->
+    <div class="card" id="batch-info-card" style="display:none;margin-bottom:1rem;background:#f8fafc;border:2px solid var(--border);">
+      <div style="font-size:0.85rem;color:var(--muted);line-height:1.6;">
+        💡 <strong>Batch Mode:</strong> Upload multiple student answer sheets at once. Student names and register numbers will be automatically extracted from individual filenames (e.g. <code>21CS001_Priya.pdf</code>) or file names.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Upload Files</div>
+
+      <!-- Answer Key Drop Area (Shared) -->
+      <div style="margin-bottom:1rem;">
+        <label style="margin-bottom:0.5rem;display:block;">Answer Key</label>
+        <div class="drop-area" id="drop-key">
+          <input type="file" id="answer_key" accept=".pdf,.png,.jpg,.jpeg,.docx,.txt,.xlsx,.xls" onchange="setFile('key',this)">
+          <div class="drop-icon">📄</div>
+          <div class="drop-label"><strong>Click or drag</strong> to upload Answer Key</div>
+          <div class="drop-formats">PDF · DOCX · TXT · IMG · XLSX</div>
+          <div class="file-chosen" id="key-filename"></div>
+        </div>
+        <button type="button" class="btn-preview" onclick="previewFile('key')">Preview extraction</button>
+      </div>
+
+      <!-- Single Student Upload Section -->
+      <div id="single-upload-section" style="margin-bottom:1rem;">
+        <label style="margin-bottom:0.5rem;display:block;">Student Answer Sheet</label>
+        <div class="drop-area" id="drop-ans">
+          <input type="file" id="student_answer" accept=".pdf,.png,.jpg,.jpeg,.docx,.txt,.xlsx,.xls" onchange="setFile('ans',this)">
+          <div class="drop-icon">📝</div>
+          <div class="drop-label"><strong>Click or drag</strong> to upload Student Answer</div>
+          <div class="drop-formats">PDF · DOCX · TXT · IMG · XLSX</div>
+          <div class="file-chosen" id="ans-filename"></div>
+        </div>
+        <button type="button" class="btn-preview" onclick="previewFile('ans')">Preview extraction</button>
+      </div>
+
+      <!-- Batch Student Upload Section -->
+      <div id="batch-upload-section" style="display:none;margin-bottom:1rem;">
+        <label style="margin-bottom:0.5rem;display:block;">Student Answer Sheets (Select Multiple)</label>
+        <div class="drop-area" id="drop-batch">
+          <input type="file" id="batch_student_answers" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.txt,.xlsx,.xls" onchange="setBatchFiles(this)">
+          <div class="drop-icon">📚</div>
+          <div class="drop-label"><strong>Click or drag multiple files</strong> to upload</div>
+          <div class="drop-formats">Select multiple files (PDF · DOCX · TXT · etc.)</div>
+          <div class="file-chosen" id="batch-file-count"></div>
+        </div>
+        <div id="batch-files-preview" style="margin-top:0.75rem;max-height:120px;overflow-y:auto;display:none;"></div>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <span>Use Semantic Similarity</span>
+          <small>Sentence Transformers (more accurate, slower)</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="use_semantic">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <button class="btn-evaluate" id="evaluate-btn" onclick="executeEvaluation()">
+        ▶ RUN EVALUATION
+      </button>
+    </div>
+  </div>
+
+  <!-- Right: Sidebar -->
+  <div class="sidebar">
+    <div class="card">
+      <div class="card-title">How It Works</div>
+      <ul class="steps">
+        <li><div class="step-num">1</div><div class="step-text"><strong>Extract</strong> — Text is pulled from PDF, image (OCR), DOCX, TXT, or Excel.</div></li>
+        <li><div class="step-num">2</div><div class="step-text"><strong>Segment</strong> — Regex & NLP detect Q1, Q2, Part A/B, (a)/(b) patterns.</div></li>
+        <li><div class="step-num">3</div><div class="step-text"><strong>Match</strong> — Student answers are aligned to the answer key by label, then position.</div></li>
+        <li><div class="step-num">4</div><div class="step-text"><strong>Evaluate</strong> — TF-IDF cosine similarity (or Sentence Transformers) scores each answer.</div></li>
+        <li><div class="step-num">5</div><div class="step-text"><strong>Store</strong> — Marks saved to Excel with one sheet per subject.</div></li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Supported Formats</div>
+      <div style="font-family:var(--mono);font-size:0.78rem;line-height:2;">
+        📄 PDF (text + scanned)<br>
+        🖼️ PNG / JPG / JPEG<br>
+        📝 DOCX (Word)<br>
+        📃 TXT (plain text)<br>
+        📊 XLSX / XLS (Excel)
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Results Panel ──────────────────────────────────────────────────────── -->
+<div id="results-panel">
+  <div class="results-header">
+    <h2 id="results-title">Evaluation Results</h2>
+    <a href="/download" class="btn-download">⬇ Download Excel</a>
+  </div>
+
+  <!-- Single Student Results View -->
+  <div id="single-results-view">
+    <div class="gauge-wrap">
+      <div class="gauge" id="score-gauge" style="--pct:0">
+        <div class="gauge-value" id="gauge-pct">0%</div>
+      </div>
+    </div>
+    <div class="score-grid">
+      <div class="score-card">
+        <div class="score-value" id="res-marks">—</div>
+        <div class="score-label">Marks Earned</div>
+      </div>
+      <div class="score-card">
+        <div class="score-value" id="res-total">—</div>
+        <div class="score-label">Total Marks</div>
+      </div>
+      <div class="score-card">
+        <div class="score-value" id="res-pct">—</div>
+        <div class="score-label">Percentage</div>
+      </div>
+    </div>
+    <div id="questions-container"></div>
+  </div>
+
+  <!-- Batch Results View -->
+  <div id="batch-results-view" style="display:none;">
+    <div class="score-grid">
+      <div class="score-card">
+        <div class="score-value" id="batch-stat-total">0</div>
+        <div class="score-label">Students Evaluated</div>
+      </div>
+      <div class="score-card">
+        <div class="score-value" id="batch-stat-avg">0%</div>
+        <div class="score-label">Average Score</div>
+      </div>
+      <div class="score-card">
+        <div class="score-value" id="batch-stat-high">0%</div>
+        <div class="score-label">Highest Score</div>
+      </div>
+    </div>
+
+    <div class="batch-table-wrap">
+      <table class="batch-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Student Name</th>
+            <th>Register No</th>
+            <th>Score</th>
+            <th>Percentage</th>
+            <th>Status</th>
+            <th>Breakdown</th>
+          </tr>
+        </thead>
+        <tbody id="batch-table-body"></tbody>
+      </table>
+    </div>
+
+    <div id="batch-student-detail" style="margin-top:2rem;display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h3 id="batch-detail-title" style="font-size:1.1rem;font-weight:600;"></h3>
+        <button class="btn-sm-view" onclick="closeBatchDetail()">✖ Close Breakdown</button>
+      </div>
+      <div id="batch-questions-container"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Loading Overlay ────────────────────────────────────────────────────── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="spinner-label" id="loading-label">EVALUATING…</div>
+  <div class="progress-steps" id="progress-steps">
+    <span class="progress-step" data-step="extract">Extract</span>
+    <span class="progress-step" data-step="segment">Segment</span>
+    <span class="progress-step" data-step="match">Match</span>
+    <span class="progress-step" data-step="score">Score</span>
+    <span class="progress-step" data-step="store">Store</span>
+  </div>
+</div>
+
+<script>
+  // ── Subject autocomplete dropdown ────────────────────────────────────────
+  const ALL_SUBJECTS = {{ subjects | tojson }};
+
+  function filterSubjects(val) {
+    const dd = document.getElementById("subject-dropdown");
+    const items = dd.querySelectorAll(".sdrop-item");
+    let anyVisible = false;
+    items.forEach(item => {
+      const match = item.dataset.val.toLowerCase().includes(val.toLowerCase());
+      item.style.display = match ? "block" : "none";
+      if (match) anyVisible = true;
+    });
+    dd.style.display = "block";
+  }
+
+  function showDropdown() {
+    const dd = document.getElementById("subject-dropdown");
+    const items = dd.querySelectorAll(".sdrop-item");
+    items.forEach(item => item.style.display = "block");
+    if (dd.children.length > 0) dd.style.display = "block";
+  }
+
+  function hideDropdown() {
+    setTimeout(() => {
+      document.getElementById("subject-dropdown").style.display = "none";
+    }, 150);
+  }
+
+  function pickSubject(val) {
+    document.getElementById("subject_input").value = val;
+    document.getElementById("subject-dropdown").style.display = "none";
+  }
+
+  let currentMode = "single";
+  let currentBatchData = [];
+
+  function setMode(mode) {
+    currentMode = mode;
+    document.getElementById("tab-single").classList.toggle("active", mode === "single");
+    document.getElementById("tab-batch").classList.toggle("active", mode === "batch");
+
+    document.getElementById("student-info-card").style.display = mode === "single" ? "block" : "none";
+    document.getElementById("batch-info-card").style.display = mode === "batch" ? "block" : "none";
+    document.getElementById("single-upload-section").style.display = mode === "single" ? "block" : "none";
+    document.getElementById("batch-upload-section").style.display = mode === "batch" ? "block" : "none";
+
+    document.getElementById("evaluate-btn").textContent = mode === "single" ? "▶ RUN EVALUATION" : "▶ RUN BATCH EVALUATION";
+    document.getElementById("results-panel").classList.remove("active");
+    document.getElementById("error-banner").classList.remove("active");
+  }
+
+  // ── File display ──────────────────────────────────────────────────────────
+  function setFile(type, input) {
+    const name = input.files[0] ? input.files[0].name : "";
+    document.getElementById(type === "key" ? "key-filename" : "ans-filename").textContent = name;
+  }
+
+  function setBatchFiles(input) {
+    const files = Array.from(input.files || []);
+    const countEl = document.getElementById("batch-file-count");
+    const previewEl = document.getElementById("batch-files-preview");
+
+    if (files.length === 0) {
+      countEl.textContent = "";
+      previewEl.style.display = "none";
+      previewEl.innerHTML = "";
+      return;
+    }
+
+    countEl.textContent = `${files.length} file${files.length > 1 ? "s" : ""} selected`;
+    previewEl.style.display = "block";
+    previewEl.innerHTML = files.map(f => `<span class="batch-tag">📄 ${f.name}</span>`).join("");
+  }
+
+  // ── Drag & Drop ───────────────────────────────────────────────────────────
+  ["drop-key", "drop-ans", "drop-batch"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("dragover", e => { e.preventDefault(); el.classList.add("dragover"); });
+    el.addEventListener("dragleave", () => el.classList.remove("dragover"));
+    el.addEventListener("drop", e => {
+      e.preventDefault();
+      el.classList.remove("dragover");
+      const input = el.querySelector("input[type=file]");
+      input.files = e.dataTransfer.files;
+      input.dispatchEvent(new Event("change"));
+    });
+  });
+
+  // ── Main Execution Router ─────────────────────────────────────────────────
+  async function executeEvaluation() {
+    document.getElementById("results-panel").classList.remove("active");
+    document.getElementById("error-banner").classList.remove("active");
+
+    const keyFile = document.getElementById("answer_key").files[0];
+    if (!keyFile) { showError("Please upload the Teacher Answer Key."); return; }
+
+    const subject = document.getElementById("subject_input").value.trim();
+    if (!subject) { showError("Please enter or select a subject name."); return; }
+
+    const maxMarks = document.getElementById("max_marks").value || 10;
+    const useSemantic = document.getElementById("use_semantic").checked;
+
+    if (currentMode === "single") {
+      const ansFile = document.getElementById("student_answer").files[0];
+      if (!ansFile) { showError("Please upload the Student Answer Sheet."); return; }
+
+      const fd = new FormData();
+      fd.append("answer_key", keyFile);
+      fd.append("student_answer", ansFile);
+      fd.append("student_name", document.getElementById("student_name").value.trim());
+      fd.append("reg_number", document.getElementById("reg_number").value.trim());
+      fd.append("subject", subject);
+      fd.append("max_marks", maxMarks);
+      fd.append("use_semantic", useSemantic);
+
+      await runSingle(fd);
+    } else {
+      const batchInput = document.getElementById("batch_student_answers");
+      const files = Array.from(batchInput.files || []);
+      if (files.length === 0) { showError("Please upload at least one student answer sheet."); return; }
+
+      const fd = new FormData();
+      fd.append("answer_key", keyFile);
+      files.forEach(f => fd.append("student_answers", f));
+      fd.append("subject", subject);
+      fd.append("max_marks", maxMarks);
+      fd.append("use_semantic", useSemantic);
+
+      await runBatch(fd);
+    }
+  }
+
+  let progressTimer = null;
+
+  function startProgressSimulation() {
+    const steps = Array.from(document.querySelectorAll(".progress-step"));
+    steps.forEach(s => s.classList.remove("active"));
+    let i = 0;
+    if (steps[i]) steps[i].classList.add("active");
+    progressTimer = setInterval(() => {
+      if (i < steps.length - 1) {
+        steps[i].classList.remove("active");
+        i += 1;
+        steps[i].classList.add("active");
+      }
+    }, 900);
+  }
+
+  function stopProgressSimulation() {
+    if (progressTimer) clearInterval(progressTimer);
+    progressTimer = null;
+    document.querySelectorAll(".progress-step").forEach(s => s.classList.remove("active"));
+  }
+
+  async function previewFile(which) {
+    const input = document.getElementById(which === "key" ? "answer_key" : "student_answer");
+    const file = input.files[0];
+    if (!file) { showError("Choose a file first to preview extraction."); return; }
+
+    const fd = new FormData();
+    fd.append(which === "key" ? "answer_key" : "student_answer", file);
+    fd.append("role", which === "key" ? "key" : "student");
+
+    document.getElementById("loading-label").textContent = "PREVIEWING…";
+    document.getElementById("loading-overlay").classList.add("active");
+    startProgressSimulation();
+
+    try {
+      const resp = await fetch("/preview", { method: "POST", body: fd });
+      const data = await resp.json();
+      if (!data.success) {
+        showError(data.errors.join(" "));
+        return;
+      }
+      const qList = data.questions.map(q => `${q.label}: ${q.text}`).join("\n\n");
+      alert(`Preview — ${data.question_count} question(s), ${data.char_count} chars\n\n${qList || data.text_preview}`);
+    } catch (e) {
+      showError("Preview failed. Is the server running?");
+    } finally {
+      stopProgressSimulation();
+      document.getElementById("loading-label").textContent = "EVALUATING…";
+      document.getElementById("loading-overlay").classList.remove("active");
+    }
+  }
+
+  // ── Single evaluation request ─────────────────────────────────────────────
+  async function runSingle(fd) {
+    document.getElementById("loading-overlay").classList.add("active");
+    document.getElementById("loading-label").textContent = "EVALUATING…";
+    startProgressSimulation();
+    document.getElementById("evaluate-btn").disabled = true;
+
+    try {
+      const resp = await fetch("/evaluate", { method: "POST", body: fd });
+      const data = await resp.json();
+
+      if (!data.success) {
+        showError(data.errors.join(" "));
+        return;
+      }
+
+      renderSingleResults(data.results);
+    } catch(e) {
+      showError("Network error. Is the Flask server running?");
+    } finally {
+      stopProgressSimulation();
+      document.getElementById("loading-overlay").classList.remove("active");
+      document.getElementById("evaluate-btn").disabled = false;
+    }
+  }
+
+  // ── Batch evaluation request ──────────────────────────────────────────────
+  async function runBatch(fd) {
+    document.getElementById("loading-overlay").classList.add("active");
+    document.getElementById("loading-label").textContent = "BATCH EVALUATING…";
+    startProgressSimulation();
+    document.getElementById("evaluate-btn").disabled = true;
+
+    try {
+      const resp = await fetch("/evaluate_batch", { method: "POST", body: fd });
+      const data = await resp.json();
+
+      if (!data.success) {
+        showError(data.errors.join(" "));
+        return;
+      }
+
+      renderBatchResults(data);
+    } catch(e) {
+      showError("Network error during batch evaluation.");
+    } finally {
+      stopProgressSimulation();
+      document.getElementById("loading-overlay").classList.remove("active");
+      document.getElementById("evaluate-btn").disabled = false;
+    }
+  }
+
+  // ── Render single student results ─────────────────────────────────────────
+  function renderSingleResults(results) {
+    document.getElementById("single-results-view").style.display = "block";
+    document.getElementById("batch-results-view").style.display = "none";
+    document.getElementById("results-title").textContent = "Single Student Evaluation Results";
+
+    document.getElementById("res-marks").textContent = results.total_marks;
+    document.getElementById("res-total").textContent = results.max_total;
+    document.getElementById("res-pct").textContent   = results.percentage + "%";
+
+    const pct = Math.max(0, Math.min(100, results.percentage));
+    const gauge = document.getElementById("score-gauge");
+    const gaugeColor = pct >= 70 ? "#10b981" : pct >= 40 ? "#f59e0b" : "#e11d48";
+    gauge.style.setProperty("--pct", pct);
+    gauge.style.setProperty("--gauge-color", gaugeColor);
+    document.getElementById("gauge-pct").textContent = pct + "%";
+
+    const container = document.getElementById("questions-container");
+    container.innerHTML = "";
+
+    results.questions.forEach((q, idx) => {
+      container.appendChild(createQuestionCard(q, idx, "single"));
+    });
+
+    document.getElementById("results-panel").classList.add("active");
+    document.getElementById("results-panel").scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ── Render batch results ──────────────────────────────────────────────────
+  function renderBatchResults(data) {
+    document.getElementById("single-results-view").style.display = "none";
+    document.getElementById("batch-results-view").style.display = "block";
+    document.getElementById("batch-student-detail").style.display = "none";
+    document.getElementById("results-title").textContent = "Batch Evaluation Summary";
+
+    currentBatchData = data.batch_results || [];
+
+    const totalStudents = currentBatchData.length;
+    const successfulRecords = currentBatchData.filter(r => r.status === "Success");
+
+    let avgScore = 0;
+    let highScore = 0;
+
+    if (successfulRecords.length > 0) {
+      const percentages = successfulRecords.map(r => r.percentage);
+      avgScore = (percentages.reduce((a, b) => a + b, 0) / percentages.length).toFixed(1);
+      highScore = Math.max(...percentages).toFixed(1);
+    }
+
+    document.getElementById("batch-stat-total").textContent = totalStudents;
+    document.getElementById("batch-stat-avg").textContent = avgScore + "%";
+    document.getElementById("batch-stat-high").textContent = highScore + "%";
+
+    const tbody = document.getElementById("batch-table-body");
+    tbody.innerHTML = "";
+
+    currentBatchData.forEach((rec, idx) => {
+      const tr = document.createElement("tr");
+
+      let badgeClass = "badge-danger";
+      if (rec.status === "Success") {
+        badgeClass = rec.percentage >= 70 ? "badge-success" : rec.percentage >= 40 ? "badge-warning" : "badge-danger";
+      }
+
+      const scoreDisplay = rec.status === "Success" ? `${rec.total_marks} / ${rec.max_total}` : "—";
+      const pctDisplay = rec.status === "Success" ? `${rec.percentage}%` : "—";
+      const statusBadge = rec.status === "Success" 
+        ? `<span class="badge ${badgeClass}">${pctDisplay}</span>` 
+        : `<span class="badge badge-danger">Failed</span>`;
+
+      tr.innerHTML = `
+        <td style="font-family:var(--mono);">${idx + 1}</td>
+        <td style="font-weight:600;text-align:left;">${rec.student_name}</td>
+        <td style="font-family:var(--mono);color:var(--muted);">${rec.reg_number}</td>
+        <td style="font-family:var(--mono);">${scoreDisplay}</td>
+        <td>${statusBadge}</td>
+        <td><small style="color:var(--muted);">${rec.filename}</small></td>
+        <td>
+          ${rec.results ? `<button class="btn-sm-view" onclick="viewBatchStudent(${idx})">🔍 Breakdown</button>` : `<span style="color:var(--muted);font-size:0.75rem;">${rec.error || "N/A"}</span>`}
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("results-panel").classList.add("active");
+    document.getElementById("results-panel").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function viewBatchStudent(idx) {
+    const student = currentBatchData[idx];
+    if (!student || !student.results) return;
+
+    document.getElementById("batch-detail-title").textContent = 
+      `Detailed Breakdown: ${student.student_name} (${student.reg_number}) — Score: ${student.total_marks}/${student.max_total} (${student.percentage}%)`;
+
+    const container = document.getElementById("batch-questions-container");
+    container.innerHTML = "";
+
+    student.results.questions.forEach((q, qidx) => {
+      container.appendChild(createQuestionCard(q, qidx, "batch"));
+    });
+
+    const detailPanel = document.getElementById("batch-student-detail");
+    detailPanel.style.display = "block";
+    detailPanel.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function closeBatchDetail() {
+    document.getElementById("batch-student-detail").style.display = "none";
+  }
+
+  function formatMetrics(q) {
+    const m = q.metrics;
+    if (!m) return "";
+    const chips = [
+      ["TF-IDF", m.tfidf],
+      ["Recall", m.keyword_recall],
+      ["Jaccard", m.jaccard],
+      ["Sequence", m.sequence],
+    ];
+    if (m.semantic != null) chips.push(["Semantic", m.semantic]);
+    return chips.map(([label, val]) =>
+      `<span class="metric-chip">${label}: ${(val * 100).toFixed(1)}%</span>`
+    ).join("");
+  }
+
+  function createQuestionCard(q, idx, prefix) {
+    const pct = Math.round(q.similarity * 100);
+    const barColor = pct >= 70 ? "#2f9e44" : pct >= 40 ? "#e67700" : "#e03131";
+    const marksColor = pct >= 70 ? "#2f9e44" : pct >= 40 ? "#e67700" : "#e03131";
+    const metricsHtml = formatMetrics(q);
+
+    const card = document.createElement("div");
+    card.className = "q-card";
+    const bodyId = `${prefix}-qbody-${idx}`;
+    const chevId = `${prefix}-chev-${idx}`;
+
+    card.innerHTML = `
+      <div class="q-header" onclick="toggleQById('${bodyId}','${chevId}')">
+        <div class="q-label">${q.label}</div>
+        <div class="q-meta">
+          <div class="similarity-bar">
+            <div class="similarity-fill" style="width:0%;background:${barColor}" data-target="${pct}"></div>
+          </div>
+          <div class="q-marks" style="color:${marksColor}">${q.marks} / ${q.max_marks}</div>
+          <div class="chevron" id="${chevId}">▼</div>
+        </div>
+      </div>
+      <div class="q-body" id="${bodyId}">
+        <div class="feedback-row">${q.feedback}</div>
+        <div class="answer-cols">
+          <div class="answer-box">
+            <div class="answer-box-label">Answer Key</div>
+            <p>${q.key_answer || "<em>—</em>"}</p>
+          </div>
+          <div class="answer-box">
+            <div class="answer-box-label">Student Answer</div>
+            <p>${q.student_answer || "<em>Not provided</em>"}</p>
+          </div>
+        </div>
+        <div style="margin-top:0.75rem;font-size:0.75rem;font-family:var(--mono);color:#334155">
+          Overall similarity: ${(q.similarity * 100).toFixed(1)}%
+        </div>
+        ${metricsHtml ? `<div class="metrics-row">${metricsHtml}</div>` : ""}
+      </div>
+    `;
+    requestAnimationFrame(() => {
+      const fill = card.querySelector(".similarity-fill");
+      if (fill) fill.style.width = fill.dataset.target + "%";
+    });
+    return card;
+  }
+
+  function toggleQById(bodyId, chevId) {
+    const body = document.getElementById(bodyId);
+    const chev = document.getElementById(chevId);
+    if (!body || !chev) return;
+    body.classList.toggle("open");
+    chev.textContent = body.classList.contains("open") ? "▲" : "▼";
+  }
+
+  function showError(msg) {
+    const banner = document.getElementById("error-banner");
+    document.getElementById("error-text").textContent = msg;
+    banner.classList.add("active");
+    banner.scrollIntoView({ behavior: "smooth" });
+  }
+</script>
+</body>
+</html>

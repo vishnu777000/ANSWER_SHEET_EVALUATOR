@@ -1,0 +1,19 @@
+Q1. Deep learning is a type of machine learning using neural networks.
+
+Q2. A neural network is a system of connected nodes like the brain.
+
+Q3. Training data is data used to train a model.
+
+Q4. Testing data is data used to check model performance.
+
+Q5. A model is used to make predictions from data.
+
+Q6. Regression is used to predict continuous values.
+
+Q7. A label is the correct output for data.
+
+Q8. Data mining means finding patterns in large data.
+
+Q9. An algorithm is a set of steps to solve a problem.
+
+Q10. Prediction is using a model to find outcomes.

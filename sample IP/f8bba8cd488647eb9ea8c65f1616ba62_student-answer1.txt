@@ -1,0 +1,19 @@
+Q1. AI is making machines act like humans.
+
+Q2. Machine learning allows systems to learn from data.
+
+Q3. Data preprocessing means preparing data.
+
+Q4. Supervised learning uses labeled data for training.
+
+Q5. Unsupervised learning uses unlabeled data.
+
+Q6. Feature extraction finds important data features.
+
+Q7. Overfitting is when model performs well only on training data.
+
+Q8. Dataset is a collection of data.
+
+Q9. Classification means grouping data into categories.
+
+Q10. Accuracy shows correct predictions percentage.
