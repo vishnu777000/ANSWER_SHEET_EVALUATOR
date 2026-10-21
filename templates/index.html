@@ -631,6 +631,52 @@
   }
   #subject_input { position: relative; }
   .field { position: relative; }
+  #review-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    padding: 2rem 1rem;
+    background: rgba(15,23,42,0.62);
+    overflow-y: auto;
+  }
+  #review-overlay.active { display: block; }
+  .review-dialog {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 24px 80px rgba(15,23,42,0.3);
+  }
+  .review-dialog h2 { margin-bottom: 0.5rem; font-size: 1.2rem; }
+  .review-dialog p { margin-bottom: 1rem; color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+  .review-item { margin-top: 1rem; }
+  .review-item label { font-weight: 600; }
+  .review-item textarea {
+    width: 100%;
+    min-height: 130px;
+    padding: 0.75rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    font: 0.88rem/1.5 var(--sans);
+    resize: vertical;
+  }
+  .review-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+  .review-actions button {
+    border: 0;
+    border-radius: 7px;
+    padding: 0.65rem 1rem;
+    cursor: pointer;
+    font: 600 0.85rem var(--sans);
+  }
+  #review-cancel { background: #e2e8f0; color: var(--ink); }
+  #review-continue { background: var(--accent); color: #fff; }
 
   @media (max-width: 720px) {
     .main-grid { grid-template-columns: 1fr; }
@@ -687,7 +733,7 @@
           <input type="text" id="subject_input" placeholder="e.g. Machine Learning" autocomplete="off" oninput="filterSubjects(this.value)" onfocus="showDropdown()" onblur="hideDropdown()">
           <div id="subject-dropdown" style="display:none;position:absolute;z-index:200;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,0.12);max-height:180px;overflow-y:auto;min-width:100%;width:100%;">
             {% for s in subjects %}
-            <div class="sdrop-item" data-val="{{ s }}" onmousedown="pickSubject('{{ s }}')">{{ s }}</div>
+            <div class="sdrop-item" data-val="{{ s }}">{{ s }}</div>
             {% endfor %}
             {% if not subjects %}
             <div class="sdrop-hint">No subjects yet — type a new one</div>
@@ -790,7 +836,7 @@
         <li><div class="step-num">1</div><div class="step-text"><strong>Extract</strong> — Text is pulled from PDF, image (OCR), DOCX, TXT, or Excel.</div></li>
         <li><div class="step-num">2</div><div class="step-text"><strong>Segment</strong> — Regex & NLP detect Q1, Q2, Part A/B, (a)/(b) patterns.</div></li>
         <li><div class="step-num">3</div><div class="step-text"><strong>Match</strong> — Student answers are aligned to the answer key by label, then position.</div></li>
-        <li><div class="step-num">4</div><div class="step-text"><strong>Evaluate</strong> — TF-IDF cosine similarity (or Sentence Transformers) scores each answer.</div></li>
+        <li><div class="step-num">4</div><div class="step-text"><strong>Evaluate</strong> — Concept and synonym coverage drive marks; an optional locally cached Sentence Transformer can refine the score.</div></li>
         <li><div class="step-num">5</div><div class="step-text"><strong>Store</strong> — Marks saved to Excel with one sheet per subject.</div></li>
       </ul>
     </div>
@@ -895,7 +941,28 @@
   </div>
 </div>
 
+<div id="review-overlay" role="dialog" aria-modal="true" aria-labelledby="review-title">
+  <div class="review-dialog">
+    <h2 id="review-title">Review extracted text</h2>
+    <p>Correct OCR mistakes before grading. The edited text will be used for this evaluation.</p>
+    <div id="review-fields"></div>
+    <div class="review-actions">
+      <button type="button" id="review-cancel" onclick="cancelTextReview()">Cancel</button>
+      <button type="button" id="review-continue" onclick="confirmTextReview()">Continue to evaluation</button>
+    </div>
+  </div>
+</div>
+
 <script>
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+  }
   // ── Subject autocomplete dropdown ────────────────────────────────────────
   const ALL_SUBJECTS = {{ subjects | tojson }};
 
@@ -929,8 +996,16 @@
     document.getElementById("subject-dropdown").style.display = "none";
   }
 
+  document.querySelectorAll(".sdrop-item").forEach(item => {
+    item.addEventListener("mousedown", event => {
+      event.preventDefault();
+      pickSubject(item.dataset.val);
+    });
+  });
+
   let currentMode = "single";
   let currentBatchData = [];
+  let pendingReview = null;
 
   function setMode(mode) {
     currentMode = mode;
@@ -967,7 +1042,9 @@
 
     countEl.textContent = `${files.length} file${files.length > 1 ? "s" : ""} selected`;
     previewEl.style.display = "block";
-    previewEl.innerHTML = files.map(f => `<span class="batch-tag">📄 ${f.name}</span>`).join("");
+    previewEl.innerHTML = files
+      .map(f => `<span class="batch-tag">📄 ${escapeHtml(f.name)}</span>`)
+      .join("");
   }
 
   // ── Drag & Drop ───────────────────────────────────────────────────────────
@@ -998,35 +1075,134 @@
 
     const maxMarks = document.getElementById("max_marks").value || 10;
     const useSemantic = document.getElementById("use_semantic").checked;
-
+    const reviewForm = new FormData();
+    reviewForm.append("answer_key", keyFile);
+    reviewForm.append("mode", currentMode);
     if (currentMode === "single") {
       const ansFile = document.getElementById("student_answer").files[0];
       if (!ansFile) { showError("Please upload the Student Answer Sheet."); return; }
-
-      const fd = new FormData();
-      fd.append("answer_key", keyFile);
-      fd.append("student_answer", ansFile);
-      fd.append("student_name", document.getElementById("student_name").value.trim());
-      fd.append("reg_number", document.getElementById("reg_number").value.trim());
-      fd.append("subject", subject);
-      fd.append("max_marks", maxMarks);
-      fd.append("use_semantic", useSemantic);
-
-      await runSingle(fd);
+      reviewForm.append("student_answer", ansFile);
     } else {
       const batchInput = document.getElementById("batch_student_answers");
       const files = Array.from(batchInput.files || []);
       if (files.length === 0) { showError("Please upload at least one student answer sheet."); return; }
-
-      const fd = new FormData();
-      fd.append("answer_key", keyFile);
-      files.forEach(f => fd.append("student_answers", f));
-      fd.append("subject", subject);
-      fd.append("max_marks", maxMarks);
-      fd.append("use_semantic", useSemantic);
-
-      await runBatch(fd);
+      files.forEach(file => reviewForm.append("student_answers", file));
     }
+
+    pendingReview = {
+      mode: currentMode,
+      subject,
+      maxMarks,
+      useSemantic,
+      studentName: document.getElementById("student_name").value.trim(),
+      regNumber: document.getElementById("reg_number").value.trim(),
+    };
+    document.getElementById("loading-label").textContent = "EXTRACTING TEXT…";
+    document.getElementById("loading-overlay").classList.add("active");
+    startProgressSimulation();
+    document.getElementById("evaluate-btn").disabled = true;
+    try {
+      const response = await fetch("/extract_for_review", {
+        method: "POST",
+        body: reviewForm,
+      });
+      const data = await response.json();
+      if (!data.success) {
+        showError(data.errors.join(" "));
+        pendingReview = null;
+        return;
+      }
+      showTextReview(data);
+    } catch (error) {
+      showError("Text extraction failed. Is the server running?");
+      pendingReview = null;
+    } finally {
+      stopProgressSimulation();
+      document.getElementById("loading-label").textContent = "EVALUATING…";
+      document.getElementById("loading-overlay").classList.remove("active");
+      document.getElementById("evaluate-btn").disabled = false;
+    }
+  }
+
+  function showTextReview(data) {
+    const fields = document.getElementById("review-fields");
+    fields.replaceChildren();
+    addReviewField(fields, "Answer key", "review-key-text", data.answer_key_text);
+    pendingReview.studentAnswers = data.student_answers;
+
+    if (pendingReview.mode === "single") {
+      addReviewField(
+        fields,
+        "Student answer",
+        "review-student-text-0",
+        data.student_answers[0].text,
+      );
+    } else {
+      data.student_answers.forEach((answer, index) => {
+        addReviewField(
+          fields,
+          answer.filename,
+          `review-student-text-${index}`,
+          answer.text,
+        );
+      });
+    }
+
+    document.getElementById("review-overlay").classList.add("active");
+    document.getElementById("review-key-text").focus();
+  }
+
+  function addReviewField(container, labelText, id, value) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "review-item";
+    const label = document.createElement("label");
+    label.htmlFor = id;
+    label.textContent = labelText;
+    const textarea = document.createElement("textarea");
+    textarea.id = id;
+    textarea.value = value || "";
+    wrapper.append(label, textarea);
+    container.appendChild(wrapper);
+  }
+
+  function cancelTextReview() {
+    pendingReview = null;
+    document.getElementById("review-overlay").classList.remove("active");
+  }
+
+  async function confirmTextReview() {
+    if (!pendingReview) return;
+    const keyText = document.getElementById("review-key-text").value;
+    if (!keyText.trim()) {
+      showError("The reviewed answer key text cannot be empty.");
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("reviewed_key_text", keyText);
+    fd.append("subject", pendingReview.subject);
+    fd.append("max_marks", pendingReview.maxMarks);
+    fd.append("use_semantic", pendingReview.useSemantic);
+
+    const review = pendingReview;
+    if (review.mode === "single") {
+      fd.append("reviewed_student_text", document.getElementById("review-student-text-0").value);
+      fd.append("student_name", review.studentName);
+      fd.append("reg_number", review.regNumber);
+      pendingReview = null;
+      document.getElementById("review-overlay").classList.remove("active");
+      await runSingle(fd);
+      return;
+    }
+
+    const answers = review.studentAnswers.map((answer, index) => ({
+      filename: answer.filename,
+      text: document.getElementById(`review-student-text-${index}`).value,
+    }));
+    fd.append("reviewed_answers", JSON.stringify(answers));
+    pendingReview = null;
+    document.getElementById("review-overlay").classList.remove("active");
+    await runBatch(fd);
   }
 
   let progressTimer = null;
@@ -1206,13 +1382,13 @@
 
       tr.innerHTML = `
         <td style="font-family:var(--mono);">${idx + 1}</td>
-        <td style="font-weight:600;text-align:left;">${rec.student_name}</td>
-        <td style="font-family:var(--mono);color:var(--muted);">${rec.reg_number}</td>
+        <td style="font-weight:600;text-align:left;">${escapeHtml(rec.student_name)}</td>
+        <td style="font-family:var(--mono);color:var(--muted);">${escapeHtml(rec.reg_number)}</td>
         <td style="font-family:var(--mono);">${scoreDisplay}</td>
         <td>${statusBadge}</td>
-        <td><small style="color:var(--muted);">${rec.filename}</small></td>
+        <td><small style="color:var(--muted);">${escapeHtml(rec.filename)}</small></td>
         <td>
-          ${rec.results ? `<button class="btn-sm-view" onclick="viewBatchStudent(${idx})">🔍 Breakdown</button>` : `<span style="color:var(--muted);font-size:0.75rem;">${rec.error || "N/A"}</span>`}
+          ${rec.results ? `<button class="btn-sm-view" onclick="viewBatchStudent(${idx})">🔍 Breakdown</button>` : `<span style="color:var(--muted);font-size:0.75rem;">${escapeHtml(rec.error || "N/A")}</span>`}
         </td>
       `;
       tbody.appendChild(tr);
@@ -1249,21 +1425,31 @@
     const m = q.metrics;
     if (!m) return "";
     const chips = [
-      ["TF-IDF", m.tfidf],
-      ["Recall", m.keyword_recall],
-      ["Jaccard", m.jaccard],
-      ["Sequence", m.sequence],
+      ["TF-IDF", Number(m.tfidf)],
+      ["Recall", Number(m.keyword_recall)],
+      ["Jaccard", Number(m.jaccard)],
+      ["Sequence", Number(m.sequence)],
     ];
-    if (m.semantic != null) chips.push(["Semantic", m.semantic]);
+    if (m.semantic != null) chips.push(["Semantic", Number(m.semantic)]);
     return chips.map(([label, val]) =>
-      `<span class="metric-chip">${label}: ${(val * 100).toFixed(1)}%</span>`
+      `<span class="metric-chip">${label}: ${Number.isFinite(val) ? (val * 100).toFixed(1) : "0.0"}%</span>`
     ).join("");
   }
 
   function createQuestionCard(q, idx, prefix) {
-    const pct = Math.round(q.similarity * 100);
+    const coverage = Math.max(
+      0,
+      Math.min(1, Number(q.coverage ?? q.similarity) || 0),
+    );
+    const pct = coverage * 100;
+    const semanticSimilarity = Number(q.semantic_similarity);
+    const marksRatio = Number(q.max_marks) > 0
+      ? Math.max(0, Math.min(1, (Number(q.marks) || 0) / Number(q.max_marks)))
+      : 0;
     const barColor = pct >= 70 ? "#2f9e44" : pct >= 40 ? "#e67700" : "#e03131";
-    const marksColor = pct >= 70 ? "#2f9e44" : pct >= 40 ? "#e67700" : "#e03131";
+    const marksColor = marksRatio >= 0.70
+      ? "#2f9e44"
+      : marksRatio >= 0.40 ? "#e67700" : "#e03131";
     const metricsHtml = formatMetrics(q);
 
     const card = document.createElement("div");
@@ -1273,29 +1459,30 @@
 
     card.innerHTML = `
       <div class="q-header" onclick="toggleQById('${bodyId}','${chevId}')">
-        <div class="q-label">${q.label}</div>
+        <div class="q-label">${escapeHtml(q.label)}</div>
         <div class="q-meta">
           <div class="similarity-bar">
             <div class="similarity-fill" style="width:0%;background:${barColor}" data-target="${pct}"></div>
           </div>
-          <div class="q-marks" style="color:${marksColor}">${q.marks} / ${q.max_marks}</div>
+          <div class="q-marks" style="color:${marksColor}">${escapeHtml(q.marks)} / ${escapeHtml(q.max_marks)}</div>
           <div class="chevron" id="${chevId}">▼</div>
         </div>
       </div>
       <div class="q-body" id="${bodyId}">
-        <div class="feedback-row">${q.feedback}</div>
+        <div class="feedback-row">${escapeHtml(q.feedback)}</div>
         <div class="answer-cols">
           <div class="answer-box">
             <div class="answer-box-label">Answer Key</div>
-            <p>${q.key_answer || "<em>—</em>"}</p>
+            <p>${q.key_answer ? escapeHtml(q.key_answer) : "<em>—</em>"}</p>
           </div>
           <div class="answer-box">
             <div class="answer-box-label">Student Answer</div>
-            <p>${q.student_answer || "<em>Not provided</em>"}</p>
+            <p>${q.student_answer ? escapeHtml(q.student_answer) : "<em>Not provided</em>"}</p>
           </div>
         </div>
         <div style="margin-top:0.75rem;font-size:0.75rem;font-family:var(--mono);color:#334155">
-          Overall similarity: ${(q.similarity * 100).toFixed(1)}%
+          Concept coverage: ${(coverage * 100).toFixed(1)}%
+          ${Number.isFinite(semanticSimilarity) ? `<br>Semantic similarity (informational): ${(semanticSimilarity * 100).toFixed(1)}%` : ""}
         </div>
         ${metricsHtml ? `<div class="metrics-row">${metricsHtml}</div>` : ""}
       </div>

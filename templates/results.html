@@ -77,7 +77,7 @@
   {% if subjects %}
   <div class="subject-tabs" id="tabs">
     {% for s in subjects %}
-    <button class="tab-btn" onclick="loadSubject('{{ s }}', this)">{{ s }}</button>
+    <button class="tab-btn" data-subject="{{ s }}">{{ s }}</button>
     {% endfor %}
   </div>
   <a href="/download" class="btn-dl">⬇ Download Full Excel</a>
@@ -99,20 +99,30 @@ async function loadSubject(subject, btn) {
 
   try {
     const resp = await fetch("/results/" + encodeURIComponent(subject));
-    const rows = await resp.json();
+    if (!resp.ok) throw new Error("Results request failed.");
+    const result = await resp.json();
+    const rows = Array.isArray(result.rows) ? result.rows : [];
 
     if (!rows.length) {
       container.innerHTML = '<div class="empty-state">No records for this subject.</div>';
       return;
     }
 
-    const headers = Object.keys(rows[0]);
-    let html = "<table><thead><tr>";
-    headers.forEach(h => html += `<th>${h}</th>`);
-    html += "</tr></thead><tbody>";
+    const headers = Array.isArray(result.columns)
+      ? result.columns
+      : Object.keys(rows[0]);
+    const table = document.createElement("table");
+    const thead = table.createTHead();
+    const headerRow = thead.insertRow();
+    headers.forEach(header => {
+      const th = document.createElement("th");
+      th.textContent = header;
+      headerRow.appendChild(th);
+    });
 
+    const tbody = table.createTBody();
     rows.forEach(row => {
-      html += "<tr>";
+      const tr = tbody.insertRow();
       headers.forEach(h => {
         let val = row[h] ?? "";
         let cls = "";
@@ -121,17 +131,22 @@ async function loadSubject(subject, btn) {
           cls = num >= 70 ? "pct-high" : num >= 40 ? "pct-mid" : "pct-low";
           val = isNaN(num) ? val : num + "%";
         }
-        html += `<td class="${cls} pct-cell">${val}</td>`;
+        const td = tr.insertCell();
+        td.className = `${cls} pct-cell`;
+        td.textContent = String(val);
       });
-      html += "</tr>";
     });
-    html += "</tbody></table>";
-    container.innerHTML = html;
+    container.replaceChildren(table);
   } catch(e) {
     container.innerHTML = '<div class="empty-state">Failed to load results.</div>';
   }
 }
 
+document.querySelectorAll(".tab-btn").forEach(button => {
+  button.addEventListener("click", () => {
+    loadSubject(button.dataset.subject, button);
+  });
+});
 document.querySelector(".tab-btn")?.click();
 </script>
 </body>

@@ -29,6 +29,12 @@ THIN_BORDER   = Border(
 )
 
 
+def _excel_safe_value(value):
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
+
+
 # ── Save / Append Result ──────────────────────────────────────────────────────
 
 def save_to_excel(filepath: str, subject: str, student_name: str,
@@ -49,6 +55,7 @@ def save_to_excel(filepath: str, subject: str, student_name: str,
     # ── Get or create the subject sheet ──────────────────────────────────────
     if subject in wb.sheetnames:
         ws = wb[subject]
+        _validate_sheet_questions(ws, results)
     else:
         ws = wb.create_sheet(title=subject)
         _write_headers(ws, results)
@@ -57,7 +64,6 @@ def save_to_excel(filepath: str, subject: str, student_name: str,
     next_row = ws.max_row + 1
 
     # ── Build row data ────────────────────────────────────────────────────────
-    q_labels = [q["label"] for q in results["questions"]]
     q_marks  = [q["marks"] for q in results["questions"]]
 
     row_data = (
@@ -65,6 +71,7 @@ def save_to_excel(filepath: str, subject: str, student_name: str,
         + q_marks
         + [results["total_marks"], f"{results['percentage']}%"]
     )
+    row_data = [_excel_safe_value(value) for value in row_data]
 
     # ── Write row with alternating fill ──────────────────────────────────────
     fill = ALT_ROW_FILL if next_row % 2 == 0 else None
@@ -76,7 +83,11 @@ def save_to_excel(filepath: str, subject: str, student_name: str,
         if fill:
             cell.fill = fill
 
-    wb.save(filepath)
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
+        wb.save(filepath)
+    finally:
+        wb.close()
 
 
 def save_batch_to_excel(filepath: str, subject: str, student_records: list):
@@ -97,34 +108,41 @@ def save_batch_to_excel(filepath: str, subject: str, student_records: list):
 
     if subject in wb.sheetnames:
         ws = wb[subject]
+        _validate_sheet_questions(ws, student_records[0]["results"])
     else:
         ws = wb.create_sheet(title=subject)
         _write_headers(ws, student_records[0]["results"])
 
-    for record in student_records:
-        results = record["results"]
-        student_name = record["student_name"]
-        reg_number = record["reg_number"]
+    try:
+        for record in student_records:
+            results = record["results"]
+            student_name = record["student_name"]
+            reg_number = record["reg_number"]
 
-        next_row = ws.max_row + 1
-        q_marks = [q["marks"] for q in results["questions"]]
+            _validate_sheet_questions(ws, results)
+            next_row = ws.max_row + 1
+            q_marks = [q["marks"] for q in results["questions"]]
 
-        row_data = (
-            [student_name, reg_number]
-            + q_marks
-            + [results["total_marks"], f"{results['percentage']}%"]
-        )
+            row_data = (
+                [student_name, reg_number]
+                + q_marks
+                + [results["total_marks"], f"{results['percentage']}%"]
+            )
+            row_data = [_excel_safe_value(value) for value in row_data]
 
-        fill = ALT_ROW_FILL if next_row % 2 == 0 else None
-        for col_idx, value in enumerate(row_data, start=1):
-            cell = ws.cell(row=next_row, column=col_idx, value=value)
-            cell.font = BODY_FONT
-            cell.alignment = CENTER
-            cell.border = THIN_BORDER
-            if fill:
-                cell.fill = fill
+            fill = ALT_ROW_FILL if next_row % 2 == 0 else None
+            for col_idx, value in enumerate(row_data, start=1):
+                cell = ws.cell(row=next_row, column=col_idx, value=value)
+                cell.font = BODY_FONT
+                cell.alignment = CENTER
+                cell.border = THIN_BORDER
+                if fill:
+                    cell.fill = fill
 
-    wb.save(filepath)
+        os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
+        wb.save(filepath)
+    finally:
+        wb.close()
 
 
 # ── Header Writer ─────────────────────────────────────────────────────────────
@@ -152,6 +170,19 @@ def _write_headers(ws, results: dict):
     ws.row_dimensions[1].height = 30
 
 
+def _validate_sheet_questions(ws, results: dict) -> None:
+    expected = ["Student Name", "Register No."]
+    expected.extend(q["label"] for q in results["questions"])
+    expected.extend(["Total", "Percentage"])
+    actual = [ws.cell(row=1, column=index).value for index in range(1, len(expected) + 1)]
+
+    if actual != expected:
+        raise ValueError(
+            "The existing subject gradebook has a different question layout. "
+            "Use a new subject name or export the existing results first."
+        )
+
+
 # ── Subject List ──────────────────────────────────────────────────────────────
 
 def get_subjects(filepath: str) -> list:
@@ -159,7 +190,10 @@ def get_subjects(filepath: str) -> list:
     if not os.path.exists(filepath):
         return []
     wb = load_workbook(filepath, read_only=True)
-    return wb.sheetnames
+    try:
+        return wb.sheetnames
+    finally:
+        wb.close()
 
 
 # ── Fetch Results for Subject ─────────────────────────────────────────────────
@@ -173,18 +207,23 @@ def get_results_for_subject(filepath: str, subject: str) -> dict:
         return {"columns": [], "rows": []}
 
     wb = load_workbook(filepath, read_only=True)
-    if subject not in wb.sheetnames:
-        return {"columns": [], "rows": []}
+    try:
+        if subject not in wb.sheetnames:
+            return {"columns": [], "rows": []}
 
-    ws = wb[subject]
-    rows = list(ws.values)
+        ws = wb[subject]
+        rows = list(ws.values)
 
-    if not rows:
-        return {"columns": [], "rows": []}
+        if not rows:
+            return {"columns": [], "rows": []}
 
-    columns = [str(c) for c in rows[0]]
-    data_rows = []
-    for row in rows[1:]:
-        data_rows.append(dict(zip(columns, [str(v) if v is not None else "" for v in row])))
+        columns = [str(c) for c in rows[0]]
+        data_rows = []
+        for row in rows[1:]:
+            data_rows.append(
+                dict(zip(columns, [str(v) if v is not None else "" for v in row]))
+            )
 
-    return {"columns": columns, "rows": data_rows}
+        return {"columns": columns, "rows": data_rows}
+    finally:
+        wb.close()

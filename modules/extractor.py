@@ -97,25 +97,59 @@ def clean_extracted_text(text: str) -> str:
     return text.strip()
 
 
-def _ocr_image(image) -> str:
-    """Run Tesseract with graceful fallback if OCR is unavailable."""
+def _ocr_image(image, config="") -> str:
+    """Run Tesseract OCR and report clear installation errors."""
     try:
         import pytesseract
-        return pytesseract.image_to_string(image, lang="eng")
-    except ImportError:
-        raise ValueError(
-            "pytesseract is not installed. Install it or upload TXT/DOCX/text-based PDF."
+
+        # Configure the common Windows installation path.
+        tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        os.environ["TESSDATA_PREFIX"] = (
+            r"C:\Program Files\Tesseract-OCR\tessdata"
         )
+
+        if os.path.isfile(tesseract_path):
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+
+        if config:
+            return pytesseract.image_to_string(
+                image,
+                lang="eng",
+                config=config,
+            )
+
+        return pytesseract.image_to_string(image, lang="eng")
+
+    except ImportError as exc:
+        raise ValueError(
+            "pytesseract is not installed. Run: pip install pytesseract"
+        ) from exc
+
     except Exception as exc:
         if exc.__class__.__name__ == "TesseractNotFoundError":
             raise ValueError(
-                "Tesseract OCR is not installed or not on PATH. "
-                "Install Tesseract or upload a text-selectable PDF/DOCX/TXT file."
+                "Tesseract OCR engine was not found. Install Tesseract OCR "
+                "and verify its installation path."
             ) from exc
+
+        error_message = str(exc)
+        lowered_error = error_message.lower()
+        if (
+            "error opening data file" in lowered_error
+            or "failed loading language" in lowered_error
+            or "could not initialize tesseract" in lowered_error
+        ):
+            raise ValueError(
+                "Tesseract could not load English language data "
+                "(eng.traineddata). Install eng.traineddata in the Tesseract "
+                "tessdata directory (for example, "
+                r"C:\Program Files\Tesseract-OCR\tessdata\eng.traineddata"
+                "), or set TESSDATA_PREFIX to that tessdata directory."
+            ) from exc
+
         raise ValueError(
-            "Tesseract OCR is not installed or not on PATH. "
-            "Install Tesseract or upload a text-selectable PDF/DOCX/TXT file."
-        )
+            f"OCR failed: {error_message}"
+        ) from exc
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
@@ -180,7 +214,7 @@ def _extract_pdf(filepath: str) -> str:
         raise ValueError(f"Could not open PDF: {exc}") from exc
 
     with pdf_ctx as pdf:
-        for page in pdf.pages:
+        for page_number, page in enumerate(pdf.pages, start=1):
             page_text = page.extract_text()
 
             if page_text and page_text.strip():
@@ -191,8 +225,10 @@ def _extract_pdf(filepath: str) -> str:
                     ocr_text = _ocr_image(page_image)
                     if ocr_text.strip():
                         text_parts.append(ocr_text)
-                except Exception:
-                    continue
+                except Exception as exc:
+                    raise ValueError(
+                        f"Could not OCR PDF page {page_number}: {exc}"
+                    ) from exc
 
     if not text_parts:
         raise ValueError(
@@ -205,20 +241,94 @@ def _extract_pdf(filepath: str) -> str:
 # ── Image Extraction ──────────────────────────────────────────────────────────
 
 def _extract_image(filepath: str) -> str:
-    """
-    Run Tesseract OCR on an image file.
-    Preprocessing (grayscale) improves accuracy on low-contrast images.
-    """
+    """Preprocess an uploaded image and try multiple OCR configurations."""
     try:
-        from PIL import Image
-        image = Image.open(filepath).convert("L")
-    except Exception as exc:
-        raise ValueError(f"Could not open image: {exc}") from exc
+        from PIL import Image, ImageChops, ImageOps, ImageFilter
+    except ImportError as exc:
+        raise ValueError(
+            "Pillow is not installed. Run: pip install Pillow"
+        ) from exc
 
-    text = _ocr_image(image)
-    if not text.strip():
-        raise ValueError("OCR returned no text from the image.")
-    return text
+    try:
+        with Image.open(filepath) as source:
+            image = ImageOps.exif_transpose(source).convert("RGB")
+    except Exception as exc:
+        raise ValueError(f"Could not open uploaded image: {exc}") from exc
+
+    scale = max(2, min(4, 1800 // max(1, image.width)))
+    image = image.resize(
+        (image.width * scale, image.height * scale),
+        Image.Resampling.LANCZOS,
+    )
+
+    gray = ImageOps.autocontrast(image.convert("L"))
+    thresholded = gray.point(lambda pixel: 0 if pixel < 155 else 255)
+    red, _, blue = image.split()
+    blue_ink = ImageChops.subtract(blue, red).point(
+        lambda difference: 255 - min(255, difference * 4)
+    )
+    candidates = [
+        (gray, "--psm 6"),
+        (gray, "--psm 11"),
+        (thresholded, "--psm 6"),
+        (thresholded.filter(ImageFilter.MedianFilter(size=3)), "--psm 11"),
+        (blue_ink, "--psm 6"),
+    ]
+
+    results = []
+    errors = []
+
+    for candidate, config in candidates:
+        try:
+            result = _ocr_image(candidate, config=config).strip()
+            if result:
+                results.append(result)
+        except ValueError as exc:
+            errors.append(str(exc))
+
+    if not results:
+        detail = errors[0] if errors else "No text detected."
+        raise ValueError(f"OCR could not read the image. {detail}")
+
+    def readability_score(text):
+        words = re.findall(r"[A-Za-z]{2,}", text)
+        letters = sum(character.isalpha() for character in text)
+        noise = sum(
+            not (
+                character.isalnum()
+                or character.isspace()
+                or character in ".,:;?!'-()"
+            )
+            for character in text
+        )
+        return len(words) * 3 + letters - noise * 2
+
+    best_text = max(results, key=readability_score)
+
+    try:
+        header = gray.crop(
+            (
+                int(gray.width * 0.03),
+                int(gray.height * 0.05),
+                max(1, int(gray.width * 0.40)),
+                max(1, int(gray.height * 0.28)),
+            )
+        )
+        header_text = _ocr_image(header, config="--psm 11")
+        label_match = re.search(
+            r"(?im)^\s*(Q\s*\.?\s*\d{1,3}"
+            r"(?:\s*\([a-z0-9]+\))?[.):]?)",
+            header_text,
+        )
+        if label_match and not re.search(
+            r"(?im)^\s*Q\s*\.?\s*\d{1,3}",
+            best_text,
+        ):
+            best_text = f"{label_match.group(1)}\n{best_text}"
+    except ValueError:
+        pass
+
+    return clean_extracted_text(best_text)
 
 
 # ── DOCX Extraction ───────────────────────────────────────────────────────────
