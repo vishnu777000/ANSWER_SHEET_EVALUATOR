@@ -60,6 +60,11 @@ class EvaluatorTests(unittest.TestCase):
         )
 
         self.assertEqual(result["total_marks"], 0.0)
+        self.assertTrue(result["questions"][0]["review_recommended"])
+        self.assertIn(
+            "No student answer detected; verify text extraction.",
+            result["questions"][0]["review_reasons"],
+        )
 
     def test_unmatched_question_gets_zero(self):
         students = [

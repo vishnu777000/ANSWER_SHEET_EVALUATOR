@@ -16,6 +16,10 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from modules.extractor import extract_text, validate_file_magic
 from modules.parser import segment_questions, segment_reference_answers
 from modules.evaluator import evaluate_answers
+from modules.evaluation_statistics import (
+    get_evaluation_statistics,
+    get_saved_results_summary,
+)
 from modules.storage import save_to_excel, save_batch_to_excel, get_subjects
 
 
@@ -186,7 +190,7 @@ def evaluate():
       - reg_number: string
       - subject: string
       - max_marks: int (marks per question)
-      - use_semantic: bool (use sentence transformers vs TF-IDF)
+      - use_semantic: bool (use local Sentence Transformer review signals)
     """
     # ── Validate inputs ───────────────────────────────────────────────────────
     reviewed_text = (
@@ -375,7 +379,7 @@ def evaluate_batch():
       - student_answers: multiple files
       - subject: string
       - max_marks: int
-      - use_semantic: bool
+      - use_semantic: bool (use local Sentence Transformer review signals)
     """
     reviewed_text = (
         "reviewed_key_text" in request.form
@@ -579,6 +583,27 @@ def results_page():
     """Render the results viewer page."""
     subjects = get_subjects(app.config["RESULTS_FILE"])
     return render_template("results.html", subjects=subjects)
+
+
+@app.route("/statistics")
+def statistics_page():
+    """Render benchmark cases alongside saved gradebook summaries."""
+    return render_template(
+        "statistics.html",
+        statistics=get_evaluation_statistics(),
+        development_statistics=get_evaluation_statistics("development"),
+        saved_results=get_saved_results_summary(app.config["RESULTS_FILE"]),
+    )
+
+
+@app.route("/statistics/data")
+def statistics_data():
+    """Return benchmark cases and summaries of saved results as JSON."""
+    return jsonify({
+        "benchmark": get_evaluation_statistics(),
+        "development_benchmark": get_evaluation_statistics("development"),
+        "saved_results": get_saved_results_summary(app.config["RESULTS_FILE"]),
+    })
 
 
 @app.route("/results/<subject>")

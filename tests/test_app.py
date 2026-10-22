@@ -54,8 +54,51 @@ class FlaskRouteTests(unittest.TestCase):
         }
 
     def test_home_and_results_pages_render(self):
-        self.assertEqual(self.client.get("/").status_code, 200)
+        home = self.client.get("/")
+        self.assertEqual(home.status_code, 200)
+        self.assertIn(b'href="/statistics">Statistics</a>', home.data)
         self.assertEqual(self.client.get("/results").status_code, 200)
+
+    def test_statistics_page_and_json_omit_binary_metrics(self):
+        page = self.client.get("/statistics")
+        self.assertEqual(page.status_code, 200)
+        self.assertNotIn(b"Binary test metrics", page.data)
+        self.assertNotIn(b"Confusion matrix", page.data)
+        self.assertNotIn(b"Accuracy =", page.data)
+        self.assertIn(b"This project does not currently use TF-IDF", page.data)
+        self.assertIn(b"102 cases", page.data)
+        self.assertIn(b"teacher", page.data)
+
+        response = self.client.get("/statistics/data")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["benchmark"]["sample_size"], 102)
+        self.assertEqual(payload["benchmark"]["split"], "test")
+        self.assertEqual(payload["development_benchmark"]["sample_size"], 30)
+        self.assertNotIn("metrics", payload["benchmark"])
+        self.assertNotIn("confusion_matrix", payload["benchmark"])
+        self.assertNotIn("accuracy", payload["benchmark"])
+        self.assertAlmostEqual(
+            payload["development_benchmark"]["metrics"]["accuracy"], 24 / 30
+        )
+        self.assertAlmostEqual(
+            payload["development_benchmark"]["metrics"]["precision"], 16 / 20
+        )
+        self.assertAlmostEqual(
+            payload["development_benchmark"]["metrics"]["recall"], 16 / 18
+        )
+        self.assertAlmostEqual(
+            payload["development_benchmark"]["metrics"]["f1_score"],
+            2 * (16 / 20) * (16 / 18) / ((16 / 20) + (16 / 18)),
+        )
+        self.assertNotIn("confusion_matrix", payload["development_benchmark"])
+        self.assertIn(b"Development benchmark metrics", page.data)
+        self.assertIn(b"80.0%", page.data)
+        self.assertIn(b"Precision", page.data)
+        self.assertIn(b"Recall", page.data)
+        self.assertIn(b"F1 Score", page.data)
+        self.assertEqual(payload["saved_results"]["student_count"], 0)
+        self.assertIn(b"View 102 benchmark sample cases", page.data)
 
     def test_single_evaluation_saves_results_and_cleans_uploads(self):
         response = self.client.post("/evaluate", data=self._single_form())
@@ -66,6 +109,15 @@ class FlaskRouteTests(unittest.TestCase):
         self.assertEqual(payload["results"]["max_total"], 5)
         self.assertTrue(os.path.isfile(self.results_file))
         self.assertEqual(os.listdir(self.upload_dir), [])
+
+        statistics = self.client.get("/statistics/data").get_json()["saved_results"]
+        self.assertEqual(statistics["student_count"], 1)
+        self.assertEqual(statistics["subject_count"], 1)
+        self.assertAlmostEqual(
+            statistics["average_percentage"],
+            payload["results"]["percentage"],
+        )
+        self.assertEqual(statistics["subjects"][0]["students"][0]["student_name"], "Test Student")
 
         stored = self.client.get("/results/Integration%20Tests")
         self.assertEqual(stored.status_code, 200)

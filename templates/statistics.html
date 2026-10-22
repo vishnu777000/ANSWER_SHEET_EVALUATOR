@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statistics · Answer Sheet Evaluator</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:#0f172a;--muted:#64748b;--border:#cbd5e1;--card:#fff;
+    --accent:#6366f1;--success:#10b981;--danger:#e11d48;
+    --mono:'Space Mono',monospace;--sans:'DM Sans',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 45%,#ecfeff 100%);color:var(--ink);min-height:100vh}
+  header{background:rgba(15,23,42,.9);color:#fff;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;box-shadow:0 8px 32px rgba(15,23,42,.15)}
+  .logo{font-size:1.05rem;font-weight:600;display:flex;align-items:center;gap:.6rem}
+  .logo-dot{width:10px;height:10px;background:var(--accent);border-radius:50%}
+  nav a{color:rgba(255,255,255,.65);text-decoration:none;font-size:.875rem;margin-left:1.5rem}
+  nav a:hover,nav a.active{color:#fff}
+  main{max-width:1080px;margin:2.25rem auto;padding:0 1.5rem 3rem}
+  h1{font-size:1.8rem;letter-spacing:-.03em;margin-bottom:.4rem}
+  .intro{color:var(--muted);line-height:1.6;margin-bottom:1.5rem}
+  .notice{border:1px solid #fcd34d;background:#fffbeb;color:#78350f;padding:1rem 1.2rem;border-radius:12px;line-height:1.55;margin-bottom:1.25rem}
+  .section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;margin:1.75rem 0 .8rem}
+  .section-heading h2{margin:0}
+  .section-heading p{color:var(--muted);font-size:.8rem}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.35rem;box-shadow:0 8px 28px rgba(15,23,42,.06);min-width:0}
+  h2{font-size:1rem;margin-bottom:1rem}
+  .saved-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem;margin-bottom:1rem}
+  .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem}
+  .kpi-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+  .kpi-value{font-family:var(--mono);font-size:1.45rem;font-weight:700;margin-top:.4rem}
+  .subject-bars{display:grid;gap:.8rem}
+  .subject-bar-row{display:grid;grid-template-columns:minmax(100px,1fr) 3fr auto;gap:.8rem;align-items:center;font-size:.82rem}
+  .subject-name{font-weight:600;overflow-wrap:anywhere}
+  .records-link{display:inline-block;margin-top:1rem;color:var(--accent);font-size:.84rem;font-weight:600;text-decoration:none}
+  .records-link:hover{text-decoration:underline}
+  .track{height:12px;background:#e2e8f0;border-radius:99px;overflow:hidden}
+  .bar{height:100%;background:linear-gradient(90deg,#6366f1,#10b981);border-radius:99px}
+  .subject-value{font-family:var(--mono);font-size:.75rem;white-space:nowrap}
+  .empty-state{border:1px dashed var(--border);border-radius:12px;padding:1.5rem;color:var(--muted);text-align:center;font-size:.9rem}
+  .empty-state a{color:var(--accent);font-weight:600}
+  .sample{color:var(--muted);font-size:.83rem;margin-top:1rem}
+  .benchmark-splits{display:grid;grid-template-columns:repeat(2,1fr);gap:.8rem;margin-bottom:1rem}
+  .split-note{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.9rem;font-size:.82rem;line-height:1.5}
+  .split-note strong{display:block;margin-bottom:.25rem}
+  .metric-chart{display:grid;gap:.9rem;margin-top:1rem}
+  .metric-row{display:grid;grid-template-columns:100px minmax(0,1fr) 58px;align-items:center;gap:.8rem}
+  .metric-name{font-size:.82rem;font-weight:600}
+  .metric-track{height:1.15rem;border-radius:99px;overflow:hidden;background:#e2e8f0}
+  .metric-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,#6366f1,#10b981)}
+  .metric-value{text-align:right;font-family:var(--mono);font-size:.78rem;font-weight:700}
+  .label-acceptable{color:#047857;font-weight:700}.label-partial{color:#92400e;font-weight:700}.label-incorrect{color:#be123c;font-weight:700}
+  .methods{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem}
+  .method{background:#f8fafc;border-radius:10px;padding:.9rem;line-height:1.5;font-size:.86rem}
+  .method strong{display:block;margin-bottom:.3rem}
+  .method-note{font-size:.78rem;color:var(--muted);margin-top:.9rem;line-height:1.5}
+  details.card{padding:0;overflow:hidden}
+  details summary{cursor:pointer;list-style:none;padding:1.2rem 1.35rem;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  details summary::-webkit-details-marker{display:none}
+  details summary::after{content:"+";font-family:var(--mono);font-size:1.1rem;color:var(--accent)}
+  details[open] summary::after{content:"−"}
+  .details-content{padding:0 1.35rem 1.35rem}
+  .table-wrap{overflow-x:auto}
+  table.results{width:100%;border-collapse:collapse;font-size:.83rem}
+  .results th,.results td{text-align:left;padding:.65rem .7rem;border-bottom:1px solid #e2e8f0}
+  .results th{font-family:var(--mono);font-size:.7rem;text-transform:uppercase;background:#f8fafc;white-space:nowrap}
+  .results td:last-child,.results td:nth-child(3),.results td:nth-child(4),.results td:nth-child(5){text-align:center;white-space:nowrap}
+  .pass{color:#047857;font-weight:700}.review{color:#be123c;font-weight:700}
+  @media(max-width:760px){header{padding:0 1rem}nav a{margin-left:.65rem;font-size:.78rem}.benchmark-splits{grid-template-columns:1fr}.methods{grid-template-columns:1fr}.saved-kpis{grid-template-columns:1fr}.section-heading{align-items:flex-start;flex-direction:column}.subject-bar-row{grid-template-columns:minmax(85px,1fr) 2fr auto}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>Answer Sheet Evaluator</div>
+  <nav>
+    <a href="/">Evaluate</a>
+    <a href="/results">Results</a>
+    <a href="/statistics" class="active">Statistics</a>
+    <a href="/download">Download Excel</a>
+  </nav>
+</header>
+<main>
+  <h1>Statistics &amp; Results</h1>
+  <p class="intro">Saved student performance and a separate, reproducible benchmark—shown independently so real grades are not mixed with sample tests.</p>
+  <div class="section-heading">
+    <h2>Saved gradebook results</h2>
+    <p>Actual results stored from your evaluations</p>
+  </div>
+  {% if saved_results.student_count %}
+  <section class="card" aria-label="Saved gradebook results">
+    <div class="saved-kpis">
+      <div class="kpi"><div class="kpi-label">Students graded</div><div class="kpi-value">{{ saved_results.student_count }}</div></div>
+      <div class="kpi"><div class="kpi-label">Subjects with results</div><div class="kpi-value">{{ saved_results.subject_count }}</div></div>
+      <div class="kpi"><div class="kpi-label">Overall average</div><div class="kpi-value">{{ "%.1f"|format(saved_results.average_percentage) }}%</div></div>
+    </div>
+    <h2>Average score by subject</h2>
+    <div class="subject-bars">
+      {% for subject in saved_results.subjects %}
+      <div class="subject-bar-row">
+        <span class="subject-name">{{ subject.subject }}</span>
+        <div class="track" role="img" aria-label="{{ subject.subject }} average {{ '%.1f'|format(subject.average_percentage) }} percent">
+          <div class="bar" style="width:{{ subject.average_percentage }}%"></div>
+        </div>
+        <span class="subject-value">{{ "%.1f"|format(subject.average_percentage) }}% · {{ subject.student_count }} student{{ "" if subject.student_count == 1 else "s" }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <a class="records-link" href="/results">View individual student records →</a>
+  </section>
+  {% else %}
+  <div class="empty-state">No saved grades yet. <a href="/">Evaluate an answer sheet</a> to populate these charts.</div>
+  {% endif %}
+
+  <div class="section-heading">
+    <h2>Benchmark statistics</h2>
+    <p>Rubric test cases · not student records</p>
+  </div>
+  <div class="notice">
+    <strong>Development benchmark only:</strong> This CSV combines answers copied from the project's bundled sample sheets with manually curated paraphrases and negative examples. Labels have not been independently graded by teachers. The {{ "%.1f"|format(statistics.threshold * 100) }}% coverage cutoff was selected using development data only; it affects benchmark classification only, not student marks.
+  </div>
+  <div class="benchmark-splits">
+    <div class="split-note"><strong>Held-out topic test split · {{ statistics.sample_size }} cases</strong>AI, NLP, Machine Learning, Compiler Design, and Computer Networks questions are reserved for this report; the evaluator is not trained on this set. It shares the small source collection and editorial labels, so it is not an independent human evaluation.</div>
+    <div class="split-note"><strong>Development split · {{ development_statistics.sample_size }} cases</strong>Deep Learning questions are shown separately for rubric development. Do not tune the rubric against the held-out test results.</div>
+  </div>
+  <section class="card" style="margin-bottom:1rem" aria-labelledby="development-accuracy-heading">
+    <h2 id="development-accuracy-heading">Development benchmark metrics</h2>
+    <div class="metric-chart" aria-label="Development benchmark metrics">
+      {% for name, value in development_statistics.metrics.items() %}
+      <div class="metric-row" role="img" aria-label="Development {{ name.replace('_', ' ')|title }}: {{ '%.1f'|format(value * 100) }} percent">
+        <span class="metric-name">{{ name.replace("_", " ")|title }}</span>
+        <div class="metric-track">
+          <div class="metric-bar" style="width:{{ value * 100 }}%"></div>
+        </div>
+        <span class="metric-value">{{ "%.1f"|format(value * 100) }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="sample">{{ development_statistics.sample_size }} development cases · Accuracy, precision, recall, and F1 are shown for rubric development only.</p>
+  </section>
+  <section class="card" style="margin-bottom:1rem" aria-labelledby="methods-heading">
+    <h2 id="methods-heading">Methods used</h2>
+    <div class="methods">
+      <div class="method"><strong>Concept and keyword matching</strong>Extracts answer concepts, matches them to the reference, and scores the fraction of reference concepts covered.</div>
+      <div class="method"><strong>Normalization and negation</strong>Normalizes common plural/verb forms and selected synonyms; detects some negated concepts so contradictions are not counted as covered.</div>
+      <div class="method"><strong>Optional semantic model</strong>The app can use a locally cached Sentence Transformer alongside concept scoring. It is disabled for this benchmark to keep the reported results reproducible.</div>
+    </div>
+    <p class="method-note">This project does not currently use TF-IDF. Benchmark cases are shown for transparency and do not measure mark-level agreement with human graders.</p>
+  </section>
+  <details class="card" aria-labelledby="cases-heading">
+    <summary id="cases-heading">View {{ statistics.sample_size }} benchmark sample cases</summary>
+    <div class="details-content">
+    <p class="sample">Held-out topic cases. "Expected" is an editorial dataset label; predictions use the development-calibrated {{ "%.1f"|format(statistics.threshold * 100) }}% coverage cutoff. Source tells you whether the answer came from the bundled example sheets or was manually authored.</p>
+    <div class="table-wrap">
+      <table class="results">
+        <thead><tr><th>ID</th><th>Topic</th><th>Expected label</th><th>Coverage</th><th>Prediction</th><th>Match</th><th>Source</th><th>Reference answer</th><th>Student answer</th></tr></thead>
+        <tbody>
+        {% for case in statistics.cases %}
+          <tr>
+            <td>{{ case.id }}</td><td>{{ case.topic }}</td>
+            <td class="label-{{ case.expected_label }}">{{ case.expected_label|title }}</td>
+            <td>{{ "%.1f"|format(case.coverage * 100) }}%</td>
+            <td>{{ "Pass" if case.predicted else "Review" }}</td>
+            <td class="{{ 'pass' if case.correct else 'review' }}">{{ "Correct" if case.correct else "Incorrect" }}</td>
+            <td>{{ case.provenance.replace("_", " ")|title }}</td>
+            <td>{{ case.reference }}</td><td>{{ case.answer }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </details>
+</main>
+</body>
+</html>

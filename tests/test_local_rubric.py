@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from modules.local_rubric import evaluate_answer
+from modules.local_rubric import evaluate_answer, extract_keywords
 from modules.parser import segment_questions
 
 
@@ -194,6 +194,26 @@ class LocalRubricTests(unittest.TestCase):
         self.assertEqual(result["coverage"], 1.0)
         self.assertEqual(result["marks"], 5.0)
 
+    def test_common_inflections_normalize_to_the_same_concept(self):
+        self.assertEqual(
+            extract_keywords("connects connected connecting"),
+            ["connect", "connect", "connect"],
+        )
+        self.assertEqual(
+            extract_keywords("machine-learning brain-inspired"),
+            ["machine", "learn", "brain", "inspire"],
+        )
+
+    def test_irregular_and_common_cs_synonyms_match(self):
+        result = evaluate_answer(
+            "Training examples are used to teach a machine learning system.",
+            "Training data is the dataset used to train a machine learning model.",
+            10,
+        )
+
+        self.assertGreaterEqual(result["coverage"], 0.5)
+        self.assertGreater(result["marks"], 0)
+
     def test_non_finite_maximum_is_rejected(self):
         for maximum in (float("nan"), float("inf")):
             with self.subTest(maximum=maximum):
@@ -211,16 +231,63 @@ class LocalRubricTests(unittest.TestCase):
             ):
                 evaluate_answer(PARAPHRASE, REFERENCE, 10, use_semantic=True)
 
-    def test_semantic_mode_reports_combined_scoring_method(self):
+    def test_semantic_mode_reports_review_signal_without_changing_scoring_method(self):
         with patch(
             "modules.local_rubric._semantic_similarity",
             return_value=0.9,
         ):
             result = evaluate_answer(PARAPHRASE, REFERENCE, 10, use_semantic=True)
 
-        self.assertEqual(result["scoring_method"], "semantic-and-concept")
+        self.assertEqual(
+            result["scoring_method"],
+            "concept-keyword-with-semantic-review",
+        )
         self.assertEqual(result["semantic_similarity"], 0.9)
         self.assertEqual(result["marks"], round(10 * result["coverage"], 2))
+
+    def test_borderline_coverage_recommends_manual_review(self):
+        result = evaluate_answer(
+            "A database stores related data.",
+            "A database is an organized collection of related data stored electronically.",
+            10,
+        )
+
+        self.assertTrue(result["review_recommended"])
+        self.assertIn("Concept coverage is borderline.", result["review_reasons"])
+
+    def test_semantic_disagreement_flags_review_without_changing_marks(self):
+        with patch(
+            "modules.local_rubric._semantic_similarity",
+            return_value=0.9,
+        ):
+            result = evaluate_answer(
+                "An unrelated fruit grows on trees.",
+                REFERENCE,
+                10,
+                use_semantic=True,
+            )
+
+        self.assertLess(result["coverage"], 0.6)
+        self.assertEqual(result["marks"], round(10 * result["coverage"], 2))
+        self.assertTrue(result["review_recommended"])
+        self.assertTrue(any(
+            "Semantic similarity and concept coverage disagree" in reason
+            for reason in result["review_reasons"]
+        ))
+
+    def test_negated_concept_recommends_manual_review(self):
+        result = evaluate_answer(
+            "A database is not a collection of related information.",
+            REFERENCE,
+            10,
+        )
+
+        self.assertTrue(result["incorrect_concepts"])
+        self.assertTrue(result["review_recommended"])
+        self.assertIn(
+            "The answer contradicts one or more reference concepts.",
+            result["review_reasons"],
+        )
 
 
 if __name__ == "__main__":

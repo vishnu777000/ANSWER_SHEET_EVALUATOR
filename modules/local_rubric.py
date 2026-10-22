@@ -17,7 +17,7 @@ STOP_WORDS = {
     "use", "helps", "help", "explain", "define", "describe", "user",
     "users", "so", "that", "it", "be", "able", "while", "very",
     "must", "each", "contain", "contains", "mark", "marks",
-    "commonly", "process", "uses",
+    "commonly", "process", "uses", "during",
 }
 
 CONCEPT_ALIASES = {
@@ -61,12 +61,57 @@ CONCEPT_ALIASES = {
     "problems": "anomaly",
     "problem": "anomaly",
     "anomalies": "anomaly",
+    "processes": "process",
+    "processed": "process",
+    "processing": "process",
+    "inspired": "inspire",
+    "inspiration": "inspire",
+    "based": "base",
+    "dataset": "data",
+    "datasets": "data",
+    "examples": "example",
+    "improves": "improve",
+    "improved": "improve",
+    "improving": "improve",
+    "performance": "perform",
+    "performs": "perform",
+    "evaluation": "evaluate",
+    "evaluates": "evaluate",
+    "evaluated": "evaluate",
+    "evaluating": "evaluate",
+    "checks": "check",
+    "checked": "check",
+    "checking": "check",
+    "predictions": "predict",
+    "prediction": "predict",
+    "predicts": "predict",
+    "predicted": "predict",
+    "predicting": "predict",
+    "estimates": "estimate",
+    "estimated": "estimate",
+    "estimating": "estimate",
+    "outcomes": "outcome",
+    "decisions": "decision",
+    "categories": "category",
+    "classes": "class",
+    "identifies": "identify",
+    "identified": "identify",
+    "identifying": "identify",
+    "interconnected": "interconnect",
+    "interconnects": "interconnect",
+    "unlabeled": "unlabel",
+    "unlabelled": "unlabel",
 }
 
 NEGATION_WORDS = {
     "not", "never", "no", "cannot", "can't", "without", "isn't",
     "aren't", "wasn't", "weren't", "doesn't", "don't", "didn't",
 }
+
+REVIEW_COVERAGE_MIN = 0.25
+REVIEW_COVERAGE_MAX = 0.55
+DECISION_THRESHOLD = 0.375
+SEMANTIC_DISAGREEMENT_MIN = 0.25
 
 
 def _tokens(text):
@@ -84,7 +129,7 @@ def _tokens(text):
     ):
         normalized = normalized.replace(contraction, expanded)
 
-    words = re.findall(r"\d+[a-z]+|[a-z][a-z0-9+#.-]*|\d+", normalized)
+    words = re.findall(r"\d+[a-z]+|[a-z][a-z0-9+#]*|\d+", normalized)
     concepts = []
     positions = []
 
@@ -95,16 +140,7 @@ def _tokens(text):
         if word in STOP_WORDS or len(word) <= 1:
             continue
 
-        concept = CONCEPT_ALIASES.get(word, word)
-        if concept not in CONCEPT_ALIASES.values():
-            if concept.endswith("ies") and len(concept) > 4:
-                concept = concept[:-3] + "y"
-            elif concept.endswith("ing") and len(concept) > 5:
-                concept = concept[:-3]
-            elif concept.endswith("ed") and len(concept) > 4:
-                concept = concept[:-2]
-            elif concept.endswith("s") and len(concept) > 3:
-                concept = concept[:-1]
+        concept = _normalize_concept(word)
 
         if concept in STOP_WORDS:
             continue
@@ -113,6 +149,48 @@ def _tokens(text):
         positions.append(index)
 
     return words, concepts, positions
+
+
+def _normalize_concept(word):
+    """Normalize common English inflections without conflating word meaning."""
+    alias = CONCEPT_ALIASES.get(word)
+    if alias is not None:
+        return alias
+
+    if len(word) > 5 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 5 and word.endswith(("sses", "shes", "ches", "xes", "zes")):
+        return word[:-2]
+    if len(word) > 5 and word.endswith("ing"):
+        stem = word[:-3]
+        if len(stem) > 2 and stem[-1] == stem[-2]:
+            stem = stem[:-1]
+        return {
+            "mak": "make",
+            "us": "use",
+            "produc": "produce",
+            "reduc": "reduce",
+            "increas": "increase",
+            "analys": "analysis",
+        }.get(stem, stem)
+    if len(word) > 4 and word.endswith("ed"):
+        stem = word[:-2]
+        if len(stem) > 2 and stem[-1] == stem[-2]:
+            stem = stem[:-1]
+        return {
+            "inspir": "inspire",
+            "bas": "base",
+            "produc": "produce",
+            "reduc": "reduce",
+            "improv": "improve",
+            "evaluat": "evaluate",
+            "identifi": "identify",
+        }.get(stem, stem)
+    if len(word) > 4 and word.endswith("es"):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s"):
+        return word[:-1]
+    return word
 
 
 def normalize_text(text):
@@ -258,6 +336,35 @@ def _format_concepts(concepts):
     return ", ".join(_concept_label(item) for item in sorted(concepts))
 
 
+def _review_reasons(
+    coverage,
+    semantic_similarity=None,
+    incorrect_concepts=None,
+    student_answer="",
+    reference_answer="",
+):
+    reasons = []
+    if not student_answer:
+        reasons.append("No student answer detected; verify text extraction.")
+    if not reference_answer:
+        reasons.append("Reference answer is missing; grading needs manual review.")
+    if incorrect_concepts:
+        reasons.append("The answer contradicts one or more reference concepts.")
+    if REVIEW_COVERAGE_MIN <= coverage <= REVIEW_COVERAGE_MAX:
+        reasons.append("Concept coverage is borderline.")
+    if semantic_similarity is not None:
+        coverage_pass = coverage >= DECISION_THRESHOLD
+        semantic_pass = semantic_similarity >= DECISION_THRESHOLD
+        if (
+            coverage_pass != semantic_pass
+            and abs(coverage - semantic_similarity) >= SEMANTIC_DISAGREEMENT_MIN
+        ):
+            reasons.append(
+                "Semantic similarity and concept coverage disagree; check meaning manually."
+            )
+    return reasons
+
+
 def evaluate_answer(
     student_answer,
     reference_answer,
@@ -279,6 +386,11 @@ def evaluate_answer(
     reference_answer = str(reference_answer or "").strip()
 
     if not student_answer:
+        review_reasons = _review_reasons(
+            0.0,
+            student_answer=student_answer,
+            reference_answer=reference_answer,
+        )
         return {
             "marks": 0.0,
             "max_marks": max_marks,
@@ -290,9 +402,16 @@ def evaluate_answer(
             "missing_concepts": extract_keywords(reference_answer),
             "incorrect_concepts": [],
             "feedback": "No student answer was detected; no reference concepts were covered.",
+            "review_recommended": bool(review_reasons),
+            "review_reasons": review_reasons,
         }
 
     if not reference_answer:
+        review_reasons = _review_reasons(
+            0.0,
+            student_answer=student_answer,
+            reference_answer=reference_answer,
+        )
         return {
             "marks": 0.0,
             "max_marks": max_marks,
@@ -304,6 +423,8 @@ def evaluate_answer(
             "missing_concepts": [],
             "incorrect_concepts": [],
             "feedback": "Reference answer is missing; grading was skipped.",
+            "review_recommended": bool(review_reasons),
+            "review_reasons": review_reasons,
         }
 
     if max_marks == 0:
@@ -318,6 +439,8 @@ def evaluate_answer(
             "missing_concepts": [],
             "incorrect_concepts": [],
             "feedback": "Maximum marks are zero.",
+            "review_recommended": False,
+            "review_reasons": [],
         }
 
     reference_concepts = _concept_set(reference_answer)
@@ -344,7 +467,7 @@ def evaluate_answer(
     if use_semantic:
         try:
             semantic_score = _semantic_similarity(student_answer, reference_answer)
-            scoring_method = "semantic-and-concept"
+            scoring_method = "concept-keyword-with-semantic-review"
         except (ImportError, OSError, RuntimeError, ValueError) as exc:
             raise ValueError(
                 "Semantic scoring was requested, but the local "
@@ -356,6 +479,13 @@ def evaluate_answer(
     # Each distinct reference concept earns an equal share of the marks.
     score_ratio = coverage
     marks = round(max_marks * score_ratio, 2)
+    review_reasons = _review_reasons(
+        coverage,
+        semantic_similarity=semantic_score,
+        incorrect_concepts=negated,
+        student_answer=student_answer,
+        reference_answer=reference_answer,
+    )
 
     covered_labels = [_concept_label(item) for item in sorted(covered)]
     missing_labels = [_concept_label(item) for item in sorted(missing)]
@@ -378,7 +508,8 @@ def evaluate_answer(
     )
     if semantic_score is not None:
         details.append(
-            f"Semantic similarity (informational): {semantic_score * 100:.1f}%."
+            f"Semantic similarity (review signal only; it does not affect marks): "
+            f"{semantic_score * 100:.1f}%."
         )
     return {
         "marks": marks,
@@ -396,4 +527,6 @@ def evaluate_answer(
         "incorrect_concepts": incorrect_labels,
         "scoring_method": scoring_method,
         "feedback": " ".join(part for part in details if part),
+        "review_recommended": bool(review_reasons),
+        "review_reasons": review_reasons,
     }

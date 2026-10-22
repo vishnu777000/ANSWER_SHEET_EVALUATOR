@@ -110,8 +110,9 @@ def evaluate_answers(
     """
     Offline grading function compatible with app.py.
 
-    similarity mirrors concept coverage as a fraction from 0 to 1 for
-    compatibility; semantic similarity is informational and does not affect marks.
+    Similarity mirrors concept coverage as a fraction from 0 to 1 for
+    compatibility. Optional semantic similarity can recommend manual review,
+    but does not affect marks.
     """
 
     if reference_answers is not None:
@@ -220,6 +221,8 @@ def evaluate_answers(
             "missing_concepts": grading.get("missing_concepts", []),
             "incorrect_concepts": grading.get("incorrect_concepts", []),
             "scoring_method": grading.get("scoring_method", "concept-keyword"),
+            "review_recommended": grading.get("review_recommended", False),
+            "review_reasons": grading.get("review_reasons", []),
             "feedback": feedback,
         })
 

@@ -1,0 +1,93 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 3651 >>
+stream
+0.380 0.430 0.520 rg BT /F2 8 Tf 1 0 0 1 54.0 755.0 Tm (ANSWER SHEET EVALUATOR  |  SAMPLE DOCUMENT) Tj ET
+0.100 0.160 0.300 rg BT /F2 20 Tf 1 0 0 1 54.0 727.0 Tm (Student Answer Sheet) Tj ET
+0.340 0.400 0.500 rg BT /F1 10 Tf 1 0 0 1 54.0 705.0 Tm (Subject: Deep Learning  |  Sample student: Alex Student  |  10 questions) Tj ET
+.78 .82 .88 RG .7 w 54 683 m 541 683 l S
+0.240 0.300 0.400 rg BT /F1 10 Tf 1 0 0 1 54.0 662.0 Tm (Synthetic sample responses for testing PDF extraction and answer evaluation. Some) Tj ET
+0.240 0.300 0.400 rg BT /F1 10 Tf 1 0 0 1 54.0 648.0 Tm (answers are partial or incorrect by design.) Tj ET
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 626.0 Tm (Q1. Explain deep learning.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 609.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 594.0 Tm (Deep learning is machine learning that learns patterns from data through neural networks) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 580.0 Tm (with many layers.) Tj ET
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 555.0 Tm (Q2. Explain neural network.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 538.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 523.0 Tm (A neural network is a system of connected nodes like the brain.) Tj ET
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 498.0 Tm (Q3. Explain training data.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 481.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 466.0 Tm (Training examples are the data a machine-learning system learns from during training.) Tj ET
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 441.0 Tm (Q4. Explain testing data.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 424.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 409.0 Tm (A separate test set checks how well a trained model performs.) Tj ET
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 384.0 Tm (Q5. Explain machine-learning model.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 367.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 352.0 Tm (A trained model uses input data to produce a prediction or decision.) Tj ET
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 327.0 Tm (Q6. Explain regression.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 310.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 295.0 Tm (A regression model estimates numeric outcomes such as temperature or price.) Tj ET
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 270.0 Tm (Q7. Explain label.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 253.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 238.0 Tm (In supervised learning, the label is the target answer paired with an input example.) Tj ET
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 213.0 Tm (Q8. Explain data mining.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 196.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 181.0 Tm (Data mining searches large collections of data for useful patterns and insights.) Tj ET
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 156.0 Tm (Q9. Explain algorithm.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 139.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 124.0 Tm (A finite sequence of instructions that solves a task is an algorithm.) Tj ET
+0.38 0.43 0.52 rg BT /F1 8 Tf 1 0 0 1 54 34 Tm (Page 1 of 2  |  Generated sample for evaluator testing) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 798 >>
+stream
+0.380 0.430 0.520 rg BT /F2 8 Tf 1 0 0 1 54.0 755.0 Tm (ANSWER SHEET EVALUATOR  |  SAMPLE DOCUMENT) Tj ET
+0.100 0.160 0.300 rg BT /F2 20 Tf 1 0 0 1 54.0 727.0 Tm (Student Answer Sheet) Tj ET
+0.340 0.400 0.500 rg BT /F1 10 Tf 1 0 0 1 54.0 705.0 Tm (Subject: Deep Learning  |  Sample student: Alex Student  |  10 questions) Tj ET
+.78 .82 .88 RG .7 w 54 683 m 541 683 l S
+0.120 0.200 0.380 rg BT /F2 11 Tf 1 0 0 1 54.0 662.0 Tm (Q10. Explain prediction.  [2 marks]) Tj ET
+0.300 0.360 0.460 rg BT /F2 10 Tf 1 0 0 1 66.0 645.0 Tm (Answer:) Tj ET
+0.130 0.180 0.290 rg BT /F1 10.5 Tf 1 0 0 1 66.0 630.0 Tm (Prediction means manually labeling the training examples before fitting a model.) Tj ET
+0.38 0.43 0.52 rg BT /F1 8 Tf 1 0 0 1 54 34 Tm (Page 2 of 2  |  Generated sample for evaluator testing) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Title (Student Answer Sheet) /Subject (Synthetic sample input documents for answer evaluation) /Creator (Answer Sheet Evaluator sample generator) >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000127 00000 n 
+0000000224 00000 n 
+0000000326 00000 n 
+0000004028 00000 n 
+0000004164 00000 n 
+0000005012 00000 n 
+0000005148 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R /Info 9 0 R >>
+startxref
+5316
+%%EOF
